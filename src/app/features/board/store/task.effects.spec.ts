@@ -1,60 +1,64 @@
+import { HttpErrorResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { provideMockActions } from '@ngrx/effects/testing';
-import { firstValueFrom, ReplaySubject } from 'rxjs';
+import { firstValueFrom, ReplaySubject, throwError } from 'rxjs';
+import { MOCK_API_LATENCY_MS } from '../../../core/api/api.config';
+import { mockApiInterceptor } from '../../../core/api/mock-api.interceptor';
 import { TaskService } from '../task.service';
 import { TaskActions } from './task.actions';
 import { TaskEffects } from './task.effects';
 
-// Exercises each effect directly against the real TaskService (an in-memory fixture, so calls
-// resolve synchronously — no need to fake a clock or a network) — confirming the action → data
-// layer call → result action leg of the flow that the component specs only cover indirectly.
+// Each effect runs against the real TaskService and the in-memory mock API (zero latency), so
+// these cover the whole action → HTTP request → result action leg of the flow. Failure paths
+// swap the service call for an error to prove the stream turns it into a Failure action.
 describe('TaskEffects', () => {
   let actions$: ReplaySubject<unknown>;
   let effects: TaskEffects;
   let taskService: TaskService;
 
+  const newTask = { title: 'Effect-added task', description: '', status: 'todo' as const, dueDate: '', subtasks: [] };
+  const serverError = () => throwError(() => new HttpErrorResponse({ status: 500 }));
+
   beforeEach(() => {
     actions$ = new ReplaySubject(1);
     TestBed.configureTestingModule({
-      providers: [TaskEffects, provideMockActions(() => actions$)],
+      providers: [
+        TaskEffects,
+        provideMockActions(() => actions$),
+        provideHttpClient(withInterceptors([mockApiInterceptor])),
+        { provide: MOCK_API_LATENCY_MS, useValue: 0 },
+      ],
     });
     effects = TestBed.inject(TaskEffects);
     taskService = TestBed.inject(TaskService);
   });
 
-  it('loadTasks$ loads every seeded task from TaskService, tagged with its board id', async () => {
+  it('loadTasks$ fetches every task from the API, each tagged with its board id', async () => {
     actions$.next(TaskActions.loadTasks());
 
     const result = await firstValueFrom(effects.loadTasks$);
 
     expect(result.type).toBe(TaskActions.loadTasksSuccess.type);
     if (result.type === TaskActions.loadTasksSuccess.type) {
-      expect(result.tasks.find((t) => t.id === 'q1-goals')).toEqual({
-        ...taskService.getTask('roadmap', 'q1-goals'),
-        boardId: 'roadmap',
-      });
-      expect(result.tasks.length).toBe(
-        ['platform-launch', 'marketing-plan', 'roadmap'].reduce(
-          (sum, boardId) => sum + taskService.getTasks(boardId).length,
-          0,
-        ),
-      );
+      expect(result.tasks.find((t) => t.id === 'q1-goals')?.boardId).toBe('roadmap');
+      expect(result.tasks.length).toBe(16);
     }
   });
 
-  it('addTask$ adds the task through TaskService and reports it back with its board id', async () => {
-    actions$.next(
-      TaskActions.addTask({
-        boardId: 'roadmap',
-        task: {
-          title: 'Effect-added task',
-          description: '',
-          status: 'todo',
-          dueDate: '',
-          subtasks: [],
-        },
-      }),
-    );
+  it('loadTasks$ reports a readable failure instead of erroring the stream', async () => {
+    vi.spyOn(taskService, 'list').mockReturnValue(serverError());
+    actions$.next(TaskActions.loadTasks());
+
+    const result = await firstValueFrom(effects.loadTasks$);
+
+    expect(result.type).toBe(TaskActions.loadTasksFailure.type);
+    if (result.type === TaskActions.loadTasksFailure.type) {
+      expect(result.error).toContain("Couldn't load tasks");
+    }
+  });
+
+  it('addTask$ creates the task on the server and reports it back with its board id', async () => {
+    actions$.next(TaskActions.addTask({ boardId: 'roadmap', task: newTask }));
 
     const result = await firstValueFrom(effects.addTask$);
 
@@ -62,37 +66,62 @@ describe('TaskEffects', () => {
     if (result.type === TaskActions.addTaskSuccess.type) {
       expect(result.task.boardId).toBe('roadmap');
       expect(result.task.title).toBe('Effect-added task');
+      expect(result.task.id).toBeTruthy();
     }
-    expect(taskService.getTasks('roadmap').some((t) => t.title === 'Effect-added task')).toBe(true);
   });
 
-  it('updateTask$ updates the task through TaskService and reports an Update<TaskEntity>', async () => {
+  it('addTask$ surfaces a server rejection (duplicate title) as a Failure with the server message', async () => {
+    actions$.next(TaskActions.addTask({ boardId: 'roadmap', task: { ...newTask, title: 'Set Q1 goals' } }));
+
+    const result = await firstValueFrom(effects.addTask$);
+
+    expect(result.type).toBe(TaskActions.addTaskFailure.type);
+    if (result.type === TaskActions.addTaskFailure.type) {
+      expect(result.error).toContain('already exists');
+    }
+  });
+
+  it('updateTask$ patches the task and reports an Update<TaskEntity>', async () => {
     actions$.next(
-      TaskActions.updateTask({
-        boardId: 'roadmap',
-        taskId: 'q1-goals',
-        changes: { status: 'done' },
-      }),
+      TaskActions.updateTask({ boardId: 'roadmap', taskId: 'q1-goals', changes: { status: 'done' } }),
     );
 
     const result = await firstValueFrom(effects.updateTask$);
 
     expect(result.type).toBe(TaskActions.updateTaskSuccess.type);
     if (result.type === TaskActions.updateTaskSuccess.type) {
-      expect(result.update).toEqual({
-        id: 'q1-goals',
-        changes: { status: 'done', boardId: 'roadmap' },
-      });
+      expect(result.update.id).toBe('q1-goals');
+      expect(result.update.changes).toMatchObject({ status: 'done', boardId: 'roadmap' });
     }
-    expect(taskService.getTask('roadmap', 'q1-goals')?.status).toBe('done');
   });
 
-  it('deleteTask$ deletes the task through TaskService and reports its id', async () => {
+  it('updateTask$ reports a Failure when the task no longer exists', async () => {
+    actions$.next(TaskActions.updateTask({ boardId: 'roadmap', taskId: 'ghost', changes: { status: 'done' } }));
+
+    const result = await firstValueFrom(effects.updateTask$);
+
+    expect(result.type).toBe(TaskActions.updateTaskFailure.type);
+  });
+
+  it('deleteTask$ deletes the task and reports its id', async () => {
     actions$.next(TaskActions.deleteTask({ boardId: 'roadmap', taskId: 'q1-goals' }));
 
     const result = await firstValueFrom(effects.deleteTask$);
 
     expect(result).toEqual(TaskActions.deleteTaskSuccess({ taskId: 'q1-goals' }));
-    expect(taskService.getTask('roadmap', 'q1-goals')).toBeUndefined();
+    const remaining = await firstValueFrom(taskService.list('roadmap'));
+    expect(remaining.some((t) => t.id === 'q1-goals')).toBe(false);
+  });
+
+  it('deleteTask$ reports a readable Failure when the server errors', async () => {
+    vi.spyOn(taskService, 'delete').mockReturnValue(serverError());
+    actions$.next(TaskActions.deleteTask({ boardId: 'roadmap', taskId: 'q1-goals' }));
+
+    const result = await firstValueFrom(effects.deleteTask$);
+
+    expect(result.type).toBe(TaskActions.deleteTaskFailure.type);
+    if (result.type === TaskActions.deleteTaskFailure.type) {
+      expect(result.error).toContain("Couldn't delete the task");
+    }
   });
 });

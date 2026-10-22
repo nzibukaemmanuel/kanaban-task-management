@@ -1,4 +1,4 @@
-import { taskReducer } from './task.reducer';
+import { seededTaskState } from './testing';
 import {
   selectAllTasks,
   selectOtherTitles,
@@ -11,7 +11,7 @@ import {
 // exercised against a full { tasks: TaskState } app-state shape rather than the bare TaskState
 // the reducer spec uses directly.
 function appState() {
-  return { [TASK_FEATURE_KEY]: taskReducer(undefined, { type: '@@INIT' }) };
+  return { [TASK_FEATURE_KEY]: seededTaskState() };
 }
 
 describe('task selectors', () => {
