@@ -18,7 +18,12 @@
         <ul class="task-detail-card__subtask-list">
           @for (subtask of t.subtasks; track subtask.id) {
             <li>
-              <input type="checkbox" [checked]="subtask.completed" disabled [attr.aria-label]="subtask.title" />
+              <input
+                type="checkbox"
+                [checked]="subtask.completed"
+                disabled
+                [attr.aria-label]="subtask.title"
+              />
               <span [class.done]="subtask.completed">{{ subtask.title }}</span>
             </li>
           }
@@ -28,7 +33,9 @@
   </div>
   <div class="task-detail-card__actions">
     <a class="btn" [routerLink]="['edit']">Edit task</a>
-    <button type="button" class="btn-secondary" (click)="deleteTask()">Delete task</button>
+    <button type="button" class="btn-secondary" [disabled]="deleting()" (click)="deleteTask()">
+      {{ deleting() ? 'Deleting…' : 'Delete task' }}
+    </button>
     <button type="button" class="btn-tertiary" (click)="goToBoard()">&larr; Back to board</button>
   </div>
 } @else {

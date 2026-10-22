@@ -1,6 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { Store } from '@ngrx/store';
+import { HttpErrorResponse } from '@angular/common/http';
+import { firstValueFrom, throwError } from 'rxjs';
+import { NotificationService } from '../../../core/notification.service';
 import { PreferencesService } from '../../../core/preferences.service';
 import { TaskDetail } from './task-detail';
 import { TaskService } from '../task.service';
@@ -45,7 +48,7 @@ describe('TaskDetail', () => {
     expect(component.task()).toBeUndefined();
   });
 
-  it('reflects an update dispatched through the store without needing a reload', () => {
+  it('reflects an update dispatched through the store without needing a reload', async () => {
     fixture.componentRef.setInput('boardId', 'roadmap');
     fixture.componentRef.setInput('taskId', 'q1-goals');
     const store = TestBed.inject(Store);
@@ -58,7 +61,7 @@ describe('TaskDetail', () => {
       }),
     );
 
-    expect(component.task()?.status).toBe('done');
+    await vi.waitFor(() => expect(component.task()?.status).toBe('done'));
   });
 
   it('navigates back to the parent board', () => {
@@ -72,33 +75,67 @@ describe('TaskDetail', () => {
   });
 
   describe('deleteTask', () => {
-    it('removes the task and navigates back to the board when confirmation is off', () => {
+    const open = (taskId = 'q1-goals') => {
+      fixture.componentRef.setInput('boardId', 'roadmap');
+      fixture.componentRef.setInput('taskId', taskId);
+    };
+    const exists = async () =>
+      (await firstValueFrom(TestBed.inject(TaskService).list('roadmap'))).some(
+        (t) => t.id === 'q1-goals',
+      );
+
+    it('deletes the task on the server and navigates back to the board when confirmation is off', async () => {
       TestBed.inject(PreferencesService).setConfirmBeforeDelete(false);
       const confirmSpy = vi.spyOn(window, 'confirm');
-      const router = TestBed.inject(Router);
-      const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
-      fixture.componentRef.setInput('boardId', 'roadmap');
-      fixture.componentRef.setInput('taskId', 'q1-goals');
+      const navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      open();
 
       component.deleteTask();
 
+      await vi.waitFor(() => expect(navigateSpy).toHaveBeenCalledWith(['/boards', 'roadmap']));
       expect(confirmSpy).not.toHaveBeenCalled();
-      expect(TestBed.inject(TaskService).getTask('roadmap', 'q1-goals')).toBeUndefined();
-      expect(navigateSpy).toHaveBeenCalledWith(['/boards', 'roadmap']);
+      expect(await exists()).toBe(false);
     });
 
-    it('does nothing when the user declines the confirmation prompt', () => {
+    it('asks for confirmation first and deletes when the user accepts', async () => {
       TestBed.inject(PreferencesService).setConfirmBeforeDelete(true);
-      vi.spyOn(window, 'confirm').mockReturnValue(false);
-      const router = TestBed.inject(Router);
-      const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
-      fixture.componentRef.setInput('boardId', 'roadmap');
-      fixture.componentRef.setInput('taskId', 'q1-goals');
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      open();
 
       component.deleteTask();
 
-      expect(TestBed.inject(TaskService).getTask('roadmap', 'q1-goals')).toBeDefined();
+      expect(confirmSpy).toHaveBeenCalledOnce();
+      await vi.waitFor(() => expect(navigateSpy).toHaveBeenCalled());
+      expect(await exists()).toBe(false);
+    });
+
+    it('does nothing when the user declines the confirmation prompt', async () => {
+      TestBed.inject(PreferencesService).setConfirmBeforeDelete(true);
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+      const navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      open();
+
+      component.deleteTask();
+
+      expect(await exists()).toBe(true);
       expect(navigateSpy).not.toHaveBeenCalled();
+    });
+
+    it('stays on the task and shows the error when the server fails the delete', async () => {
+      TestBed.inject(PreferencesService).setConfirmBeforeDelete(false);
+      const navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      vi.spyOn(TestBed.inject(TaskService), 'delete').mockReturnValue(
+        throwError(() => new HttpErrorResponse({ status: 500 })),
+      );
+      const notificationService = TestBed.inject(NotificationService);
+      open();
+
+      component.deleteTask();
+
+      await vi.waitFor(() => expect(notificationService.notice()?.kind).toBe('error'));
+      expect(navigateSpy).not.toHaveBeenCalled();
+      expect(component.task()).toBeDefined();
     });
   });
 });
