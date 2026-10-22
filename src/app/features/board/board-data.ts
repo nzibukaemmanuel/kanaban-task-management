@@ -16,9 +16,9 @@ export interface Task {
   subtasks: Subtask[];
 }
 
+// Seed data for the mock API (core/api/mock-api.db.ts) and for specs — the app itself never reads
+// it directly; it loads boards and tasks over HttpClient. The keys double as the seeded board ids.
 export const BOARD_TASKS: Record<string, Task[]> = {
-  // keys below double as the app's board id list — BOARD_IDS derives from them so board
-  // pickers (Boards quick-jump, Settings' default board) never drift out of sync with the data.
   'platform-launch': [
     {
       id: 'define-scope',

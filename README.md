@@ -2,11 +2,90 @@
 
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.1.5.
 
+## HTTP & API integration
+
+All board and task data now travels over Angular's `HttpClient`. There is no hosted backend for this lab, so a
+**mock API** stands in for one: `core/api/mock-api.interceptor.ts` is an `HttpInterceptorFn` that answers
+`/api/*` requests from an in-memory database (`mock-api.db.ts`, seeded from `board-data.ts`) after a simulated
+latency. Because it sits at the HTTP boundary, the services, effects and components are written exactly as
+they would be against a real server — pointing at one is a config change, not a code change.
+
+### Endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/boards` | list boards |
+| POST / DELETE | `/api/boards`, `/api/boards/:id` | create / delete a board (deleting also removes its tasks) |
+| GET | `/api/tasks?boardId=` | list tasks, optionally for one board |
+| GET | `/api/tasks/:id` | one task |
+| POST | `/api/tasks` | create (server assigns the id; rejects short or duplicate titles) |
+| PATCH | `/api/tasks/:id` | update changed fields |
+| DELETE | `/api/tasks/:id` | delete |
+
+Failures carry real status codes (400 invalid, 404 missing, 409 duplicate title, 500 server) and a `{ message }`
+body, which `describeHttpError` turns into a user-facing sentence ("The server can't be reached…", etc.).
+
+### Layers
+
+```
+component ──dispatch──▶ TaskEffects ──▶ TaskService (HttpClient) ──▶ /api  (mock interceptor or real server)
+    ▲                       │
+    └── store selectors ◀── reducer ◀── Success / Failure action
+```
+
+- `TaskService` / `BoardService` — the only code that builds URLs or calls `HttpClient`. `TaskService` is
+  stateless (cold Observables); `BoardService` caches the board list in a signal.
+- `TaskEffects` — `switchMap` for the initial load (a retry cancels a stale one), `concatMap` for writes
+  (they run in order). `catchError` sits inside each inner pipe, so a failed request becomes a `Failure`
+  action and the effect keeps working.
+- `TaskState` — `loaded` / `loading` (initial fetch), `saving` (a write is in flight) and `error`.
+- `BoardDataStatus` + `DataState` — one shared answer to "are boards and tasks here yet?", rendered as a
+  spinner, or an error with a **Try again** button that only re-requests what is missing.
+
+### Behaviour by task
+
+- **Forms (add/edit):** the form shows "Saving…" and disables submit while the request runs. The page only
+  navigates away, and only reports success, once the server confirms; on failure the user stays on the form
+  with their input intact and sees the server's message. The form is marked pristine only after success, so
+  the unsaved-changes guard still protects edits that failed to save.
+- **Delete:** confirmation first (unless turned off in Settings), then the request; the task disappears from
+  every view when the server confirms, with no reload.
+- **Loading / errors:** boards pages show a spinner until both datasets arrive, and an error with retry if
+  either fails. To see the error state locally run `localStorage.setItem('kanban-mock-api-fail', 'true')` in
+  the browser console and reload (remove the key to recover).
+- **Fewer requests:** boards and tasks are fetched once at bootstrap and cached (signal / NgRx store); every
+  page reads the cache, so navigating between boards makes no requests. `BoardService.load()` also
+  de-duplicates concurrent callers.
+- **Separation of concerns:** components never touch `HttpClient` or a URL — they dispatch actions and read
+  selectors — so swapping the transport (or adding auth headers, retries, caching) touches one layer.
+
+### Environments (bonus)
+
+`src/environments/environment.ts` (development) and `environment.prod.ts` (production, swapped in by
+`fileReplacements` in `angular.json`) both satisfy `Environment` from `environment.model.ts`:
+
+| Key | Dev | Prod |
+|---|---|---|
+| `apiUrl` | `/api` | `/api` |
+| `useMockApi` | `true` | `true` |
+| `mockLatencyMs` | 500 | 200 |
+
+To use a real backend, set `useMockApi: false` and `apiUrl` to its base URL (e.g.
+`https://api.example.com`); `app.config.ts` then registers `HttpClient` without the mock interceptor. No
+secrets belong in these files — they ship in the client bundle.
+
+### Testing the API layer
+
+- `mock-api.interceptor.spec.ts` — every route, status code and the failure flag through a real `HttpClient`.
+- `task.service.spec.ts` / `board.service.spec.ts` — `HttpTestingController`: verbs, URLs, query params,
+  bodies, caching and error pass-through.
+- `task.effects.spec.ts` — each effect against the mock API, plus server-error → `Failure` paths.
+- Component specs cover the success path *and* the failure path (stay on the form / task, show the error).
+
 ## State management
 
-There's no backend behind this app yet — `board-data.ts` is the fixture every service and the
-store both boot from — so "state management" here is about how the *client-side* copy of that
-data flows between components, not about caching a real API response.
+The server (mock or real) is the source of truth; "state management" here is about how the client-side copy of
+that data is cached and flows between components.
 
 ### Local vs. global state
 
@@ -65,15 +144,14 @@ reinvented where NgRx already solves it.
 
 ### Task state — actions → effects → reducer → selectors
 
-`TaskService` remains the actual data layer (an in-memory fixture today; swapping in a real HTTP-backed
-service later wouldn't change anything above it). Components no longer inject it directly — they
-dispatch `TaskActions` and read back through `store.selectSignal(...)`:
+`TaskService` is the HTTP data layer. Components don't inject it — they dispatch `TaskActions` and read back
+through `store.selectSignal(...)`:
 
 ```
 component.dispatch(TaskActions.addTask({ boardId, task }))
       │
       ▼
-TaskEffects.addTask$  →  calls TaskService.addTask(...)  →  dispatches TaskActions.addTaskSuccess({ task })
+TaskEffects.addTask$  →  TaskService.create(...)  →  POST /api/tasks  →  TaskActions.addTaskSuccess({ task })
       │
       ▼
 taskReducer  →  taskAdapter.addOne(task, state)
@@ -83,15 +161,15 @@ selectAllTasks / selectTasksByBoard(boardId)  →  components re-render
 ```
 
 - `task.actions.ts` — `Load Tasks`, `Add/Update/Delete Task` (+ their `Success`/`Failure` pairs), via `createActionGroup`.
-- `task.reducer.ts` — `EntityAdapter<TaskEntity>`-backed `TaskState` (`TaskEntity` = `Task` + `boardId`), seeded from the same fixture `TaskService` boots from so the board never shows an empty loading state.
+- `task.reducer.ts` — `EntityAdapter<TaskEntity>`-backed `TaskState` (`TaskEntity` = `Task` + `boardId`). Starts empty and `loaded: false`; the first `Load Tasks` response fills it.
 - `task.selectors.ts` — `selectAllTasks`, plus parameterized factories (`selectTasksByBoard`, `selectTaskByBoardAndId`, `selectOtherTitles`) for the boardId-scoped reads components actually need.
-- `task.effects.ts` — the only place `TaskService` is called from now; turns each intent action into a `TaskService` call and a `Success`/`Failure` action.
-- `testing.ts` — `provideTaskStoreForTests()`, the one place spec files get the same store/effects wiring `app.config.ts` provides for real.
+- `task.effects.ts` — the only place `TaskService` is called from now; turns each intent action into an HTTP call and a `Success`/`Failure` action.
+- `testing.ts` — `provideTaskStoreForTests()` (store + effects + `HttpClient` wired to the zero-latency mock API, pre-loaded with the fixture unless `{ seeded: false }`) and `loadBoardsForTests()`.
 
 ### Debugging with NgRx DevTools
 
 `provideStoreDevtools` is wired up in `app.config.ts` (`app.ts` dispatches `TaskActions.loadTasks()` on
-boot so there's a real load action to see, not just the seeded state). With the
+boot, so the load request, its Success action and the resulting state are all visible). With the
 [Redux DevTools browser extension](https://github.com/reduxjs/redux-devtools) installed, `ng serve` and
 opening the extension panel shows every dispatched action (`[Task] Add Task` → `[Task] Add Task
 Success`, etc.) and the resulting state diff in real time.
@@ -99,7 +177,7 @@ Success`, etc.) and the resulting state diff in real time.
 ### Testing
 
 - `task.reducer.spec.ts` / `task.selectors.spec.ts` — pure state-shape tests, no Angular DI.
-- `task.effects.spec.ts` — each effect against the real `TaskService`, using `provideMockActions`.
+- `task.effects.spec.ts` — each effect against the real `TaskService` and mock API, using `provideMockActions`.
 - Component specs (`boards.spec.ts`, `board-details.spec.ts`, `add-task.spec.ts`, `edit-task.spec.ts`,
   `task-detail.spec.ts`) and the router-level `task-form-routing.integration.spec.ts` dispatch actions
   or drive the UI and assert the store-backed reads update without a reload.
