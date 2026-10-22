@@ -1,4 +1,5 @@
 import { ApplicationConfig, isDevMode, provideBrowserGlobalErrorListeners } from '@angular/core';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import {
   PreloadAllModules,
   provideRouter,
@@ -9,7 +10,9 @@ import {
 import { provideEffects } from '@ngrx/effects';
 import { provideStore } from '@ngrx/store';
 import { provideStoreDevtools } from '@ngrx/store-devtools';
+import { environment } from '../environments/environment';
 import { routes } from './app.routes';
+import { mockApiInterceptor } from './core/api/mock-api.interceptor';
 import { TASK_FEATURE_KEY } from './features/board/store/task.selectors';
 import { taskReducer } from './features/board/store/task.reducer';
 import { TaskEffects } from './features/board/store/task.effects';
@@ -26,6 +29,9 @@ export const appConfig: ApplicationConfig = {
       // trading a little idle bandwidth for instant navigation later.
       withPreloading(PreloadAllModules),
     ),
+    // All data services go through HttpClient. In mock mode the interceptor answers requests from
+    // an in-memory backend; otherwise they go out to environment.apiUrl.
+    provideHttpClient(withInterceptors(environment.useMockApi ? [mockApiInterceptor] : [])),
     provideStore({ [TASK_FEATURE_KEY]: taskReducer }),
     provideEffects(TaskEffects),
     // Only wired up in dev builds — the Redux DevTools browser extension connects to this and
