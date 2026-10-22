@@ -12,7 +12,13 @@ import {
   viewChild,
   viewChildren,
 } from '@angular/core';
-import { FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormBuilder,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import { NotificationService } from '../../../core/notification.service';
 import { SelectField, SelectFieldOption } from '../../../shared/select-field/select-field';
 import { Subtask, Task } from '../board-data';
@@ -62,6 +68,9 @@ export class TaskForm {
   // Sibling task titles on the same board (excluding this task itself, when editing) — feeds
   // the duplicate-title check below.
   readonly existingTitles = input<string[]>([]);
+  // True while the host's save request is in flight: disables the submit button so a double
+  // click can't post the same task twice.
+  readonly saving = input(false);
 
   readonly save = output<TaskFormValue>();
   readonly cancel = output<void>();
@@ -80,14 +89,24 @@ export class TaskForm {
   protected readonly statusErrorId = `${this.instanceId}-status-error`;
 
   private readonly titleInputRef = viewChild<ElementRef<HTMLInputElement>>('titleInput');
-  private readonly descriptionInputRef = viewChild<ElementRef<HTMLTextAreaElement>>('descriptionInput');
+  private readonly descriptionInputRef =
+    viewChild<ElementRef<HTMLTextAreaElement>>('descriptionInput');
   private readonly dueDateInputRef = viewChild<ElementRef<HTMLInputElement>>('dueDateInput');
   private readonly statusField = viewChild(SelectField);
-  private readonly addSubtaskButtonRef = viewChild<ElementRef<HTMLButtonElement>>('addSubtaskButton');
-  private readonly subtaskTitleInputs = viewChildren<ElementRef<HTMLInputElement>>('subtaskTitleInput');
+  private readonly addSubtaskButtonRef =
+    viewChild<ElementRef<HTMLButtonElement>>('addSubtaskButton');
+  private readonly subtaskTitleInputs =
+    viewChildren<ElementRef<HTMLInputElement>>('subtaskTitleInput');
 
   protected readonly form = this.fb.nonNullable.group({
-    title: ['', [Validators.required, Validators.minLength(3), duplicateTitleValidator(() => this.existingTitles())]],
+    title: [
+      '',
+      [
+        Validators.required,
+        Validators.minLength(3),
+        duplicateTitleValidator(() => this.existingTitles()),
+      ],
+    ],
     description: ['', [Validators.maxLength(500)]],
     status: ['', [Validators.required]],
     dueDate: [''],
@@ -188,6 +207,12 @@ export class TaskForm {
       dueDate,
       subtasks: subtasks.map((subtask) => ({ ...subtask, title: subtask.title.trim() })),
     });
+    // Deliberately not marked pristine here: the save may still fail on the server, and a form
+    // that looks saved would let the unsaved-changes guard wave the user away from their edits.
+    // The host calls markSaved() once the server confirms.
+  }
+
+  markSaved(): void {
     this.form.markAsPristine();
   }
 

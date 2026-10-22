@@ -14,7 +14,7 @@ import { AddTask } from './add-task/add-task';
 import { BoardDetails } from './board-details/board-details';
 import { EditTask } from './edit-task/edit-task';
 import { TaskDetail } from './task-detail/task-detail';
-import { provideTaskStoreForTests } from './store/testing';
+import { loadBoardsForTests, provideTaskStoreForTests } from './store/testing';
 
 // Exercises Add/Edit Task through the *real* router config (the same one main.ts boots),
 // rather than the per-component/per-route-array unit specs elsewhere. Those confirm each piece
@@ -83,8 +83,9 @@ describe('Task form navigation (integration)', () => {
   });
 
   describe('once authenticated', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       authService.login('MANNAZ', 'NZIBUKA123');
+      await loadBoardsForTests();
     });
 
     it('resolves /boards/:boardId/new-task to the AddTask component', async () => {

@@ -1,11 +1,13 @@
 import { Component, computed, inject, input, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
+import { Actions, ofType } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
+import { take } from 'rxjs';
 import { ComponentWithUnsavedChanges } from '../../../core/unsaved-changes.guard';
 import { NotificationService } from '../../../core/notification.service';
 import { TaskForm, TaskFormValue } from '../task-form/task-form';
 import { TaskActions } from '../store/task.actions';
-import { selectAllTasks } from '../store/task.selectors';
+import { selectAllTasks, selectTasksSaving } from '../store/task.selectors';
 
 @Component({
   imports: [TaskForm],
@@ -16,12 +18,14 @@ import { selectAllTasks } from '../store/task.selectors';
 export class EditTask implements ComponentWithUnsavedChanges {
   private readonly router = inject(Router);
   private readonly store = inject(Store);
+  private readonly actions$ = inject(Actions);
   private readonly notificationService = inject(NotificationService);
 
   readonly boardId = input('');
   readonly taskId = input('');
 
   private readonly allTasks = this.store.selectSignal(selectAllTasks);
+  readonly saving = this.store.selectSignal(selectTasksSaving);
 
   readonly task = computed(() =>
     this.allTasks().find((task) => task.boardId === this.boardId() && task.id === this.taskId()),
@@ -38,12 +42,22 @@ export class EditTask implements ComponentWithUnsavedChanges {
     return this.taskForm()?.isDirty() ?? false;
   }
 
+  // See AddTask.onSave: navigation waits for the server, and a failure keeps the user's edits.
   onSave(value: TaskFormValue): void {
+    this.actions$
+      .pipe(ofType(TaskActions.updateTaskSuccess, TaskActions.updateTaskFailure), take(1))
+      .subscribe((outcome) => {
+        if (outcome.type === TaskActions.updateTaskFailure.type) {
+          this.notificationService.error(outcome.error);
+          return;
+        }
+        this.taskForm()?.markSaved();
+        this.notificationService.success(`"${value.title}" was updated.`);
+        this.goToTask();
+      });
     this.store.dispatch(
       TaskActions.updateTask({ boardId: this.boardId(), taskId: this.taskId(), changes: value }),
     );
-    this.notificationService.success(`"${value.title}" was updated.`);
-    this.goToTask();
   }
 
   onCancel(): void {

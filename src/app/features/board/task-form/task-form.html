@@ -1,5 +1,7 @@
 <form [formGroup]="form" (ngSubmit)="submit()" class="task-form">
-  <p class="task-form__required-note">Fields marked <span aria-hidden="true">*</span> are required.</p>
+  <p class="task-form__required-note">
+    Fields marked <span aria-hidden="true">*</span> are required.
+  </p>
 
   <label>
     Title <span class="required-indicator" aria-hidden="true">*</span>
@@ -9,7 +11,9 @@
       formControlName="title"
       aria-required="true"
       [attr.aria-invalid]="form.controls.title.invalid && form.controls.title.touched ? true : null"
-      [attr.aria-describedby]="form.controls.title.invalid && form.controls.title.touched ? titleErrorId : null"
+      [attr.aria-describedby]="
+        form.controls.title.invalid && form.controls.title.touched ? titleErrorId : null
+      "
     />
   </label>
 
@@ -32,27 +36,37 @@
       formControlName="description"
       rows="4"
       maxlength="500"
-      [attr.aria-invalid]="form.controls.description.invalid && form.controls.description.touched ? true : null"
+      [attr.aria-invalid]="
+        form.controls.description.invalid && form.controls.description.touched ? true : null
+      "
       [attr.aria-describedby]="
-        form.controls.description.invalid && form.controls.description.touched ? descriptionErrorId : null
+        form.controls.description.invalid && form.controls.description.touched
+          ? descriptionErrorId
+          : null
       "
     ></textarea>
   </label>
 
   @if (form.controls.description.invalid && form.controls.description.touched) {
-    <p class="field-error" role="alert" [id]="descriptionErrorId">Description must be 500 characters or fewer.</p>
+    <p class="field-error" role="alert" [id]="descriptionErrorId">
+      Description must be 500 characters or fewer.
+    </p>
   }
 
   <div class="task-form__row">
     <label>
-      <span [id]="statusLabelId">Status <span class="required-indicator" aria-hidden="true">*</span></span>
+      <span [id]="statusLabelId"
+        >Status <span class="required-indicator" aria-hidden="true">*</span></span
+      >
       <app-select-field
         [options]="statusOptions"
         [value]="status()"
         [ariaLabelledby]="statusLabelId"
         [ariaRequired]="true"
         [ariaInvalid]="form.controls.status.invalid && form.controls.status.touched ? true : null"
-        [ariaDescribedby]="form.controls.status.invalid && form.controls.status.touched ? statusErrorId : null"
+        [ariaDescribedby]="
+          form.controls.status.invalid && form.controls.status.touched ? statusErrorId : null
+        "
         (valueChange)="setStatus($event)"
       />
     </label>
@@ -84,9 +98,13 @@
             formControlName="title"
             placeholder="Subtask name"
             [attr.aria-label]="'Subtask ' + (i + 1) + ' name'"
-            [attr.aria-invalid]="subtask.controls.title.invalid && subtask.controls.title.touched ? true : null"
+            [attr.aria-invalid]="
+              subtask.controls.title.invalid && subtask.controls.title.touched ? true : null
+            "
             [attr.aria-describedby]="
-              subtask.controls.title.invalid && subtask.controls.title.touched ? subtaskErrorId(i) : null
+              subtask.controls.title.invalid && subtask.controls.title.touched
+                ? subtaskErrorId(i)
+                : null
             "
           />
           <button
@@ -106,7 +124,9 @@
       }
     </div>
 
-    <button #addSubtaskButton type="button" class="btn-secondary" (click)="addSubtask()">+ Add subtask</button>
+    <button #addSubtaskButton type="button" class="btn-secondary" (click)="addSubtask()">
+      + Add subtask
+    </button>
   </fieldset>
 
   @if (isDirty()) {
@@ -115,6 +135,6 @@
 
   <div class="task-form__actions">
     <button type="button" class="btn-secondary" (click)="cancel.emit()">Cancel</button>
-    <button type="submit">{{ submitLabel() }}</button>
+    <button type="submit" [disabled]="saving()">{{ saving() ? 'Saving…' : submitLabel() }}</button>
   </div>
 </form>

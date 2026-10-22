@@ -6,6 +6,7 @@
   <app-task-form
     [initialTask]="t"
     [existingTitles]="existingTitles()"
+    [saving]="saving()"
     submitLabel="Save changes"
     (save)="onSave($event)"
     (cancel)="onCancel()"
