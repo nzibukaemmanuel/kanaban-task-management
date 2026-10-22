@@ -1,24 +1,63 @@
-import { Injectable } from '@angular/core';
-import { Observable, ReplaySubject } from 'rxjs';
-import { BOARD_IDS } from './board-data';
+import { HttpClient } from '@angular/common/http';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { Observable, tap } from 'rxjs';
+import { describeHttpError } from '../../core/api/api-error';
+import { API_BASE_URL, API_ENDPOINTS } from '../../core/api/api.config';
+import { BoardDto } from '../../core/api/api.models';
 
-// Single owner of "what boards exist" so Boards, BoardDetails, and Settings all read the same
-// list instead of each importing BOARD_IDS from the fixture data directly.
-//
-// Backed by a ReplaySubject(1) rather than a plain field so any subscriber — including one that
-// subscribes after the list was set — gets the current board list and every value after it.
+type LoadStatus = 'idle' | 'loading' | 'loaded' | 'error';
+
+// Single owner of "what boards exist" so Boards, BoardDetails, Settings and the sidebar all read
+// the same list. The list is fetched once and cached in a signal: every later reader gets it
+// for free, and `load()` is a no-op while a request is in flight or the list is already here, so
+// opening five components that each ask for boards still costs one request.
 @Injectable({ providedIn: 'root' })
 export class BoardService {
-  private readonly boardIdsSubject = new ReplaySubject<readonly string[]>(1);
-  readonly boardIds$: Observable<readonly string[]> = this.boardIdsSubject.asObservable();
+  private readonly http = inject(HttpClient);
+  private readonly url = `${inject(API_BASE_URL)}/${API_ENDPOINTS.boards}`;
 
-  readonly boardIds: readonly string[] = BOARD_IDS;
+  private readonly ids = signal<readonly string[]>([]);
+  private readonly status = signal<LoadStatus>('idle');
+  private readonly errorMessage = signal<string | null>(null);
 
-  constructor() {
-    this.boardIdsSubject.next(this.boardIds);
+  readonly boardIds = this.ids.asReadonly();
+  readonly loading = computed(() => this.status() === 'loading');
+  readonly loaded = computed(() => this.status() === 'loaded');
+  readonly error = this.errorMessage.asReadonly();
+
+  // Fire-and-forget: results land in the signals above. `force` bypasses the cache (used by the
+  // Retry button after a failure).
+  load(force = false): void {
+    if (this.status() === 'loading' || (this.status() === 'loaded' && !force)) {
+      return;
+    }
+    this.status.set('loading');
+    this.errorMessage.set(null);
+    this.http.get<BoardDto[]>(this.url).subscribe({
+      next: (boards) => {
+        this.ids.set(boards.map((board) => board.id));
+        this.status.set('loaded');
+      },
+      error: (error: unknown) => {
+        this.errorMessage.set(describeHttpError(error, 'load boards'));
+        this.status.set('error');
+      },
+    });
   }
 
   boardExists(boardId: string): boolean {
-    return this.boardIds.includes(boardId);
+    return this.ids().includes(boardId);
+  }
+
+  create(boardId: string): Observable<BoardDto> {
+    return this.http
+      .post<BoardDto>(this.url, { id: boardId })
+      .pipe(tap((board) => this.ids.update((ids) => [...ids, board.id])));
+  }
+
+  delete(boardId: string): Observable<void> {
+    return this.http
+      .delete<void>(`${this.url}/${encodeURIComponent(boardId)}`)
+      .pipe(tap(() => this.ids.update((ids) => ids.filter((id) => id !== boardId))));
   }
 }

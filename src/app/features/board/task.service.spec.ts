@@ -1,142 +1,116 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { firstValueFrom } from 'rxjs';
+import { API_BASE_URL } from '../../core/api/api.config';
+import { TaskDto } from '../../core/api/api.models';
 import { TaskService } from './task.service';
+
+const dto: TaskDto = {
+  id: 'q1-goals',
+  boardId: 'roadmap',
+  title: 'Q1 goals',
+  description: '',
+  status: 'todo',
+  dueDate: '',
+  subtasks: [],
+};
 
 describe('TaskService', () => {
   let service: TaskService;
+  let httpMock: HttpTestingController;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: API_BASE_URL, useValue: 'https://api.test' },
+      ],
+    });
     service = TestBed.inject(TaskService);
+    httpMock = TestBed.inject(HttpTestingController);
   });
 
-  it('returns the seeded tasks for a known board', () => {
-    expect(service.getTasks('roadmap').map((task) => task.id)).toEqual([
-      'q1-goals',
-      'prioritize-features',
-      'q2-goals',
-      'review-roadmap-risks',
-    ]);
+  afterEach(() => httpMock.verify());
+
+  it('GETs every task from the configured base URL', () => {
+    let result: TaskDto[] | undefined;
+    service.list().subscribe((tasks) => (result = tasks));
+
+    const req = httpMock.expectOne('https://api.test/tasks');
+    expect(req.request.method).toBe('GET');
+    req.flush([dto]);
+
+    expect(result).toEqual([dto]);
   });
 
-  it('returns an empty array for an unknown board', () => {
-    expect(service.getTasks('does-not-exist')).toEqual([]);
+  it('filters the list by board with a boardId query param', () => {
+    service.list('roadmap').subscribe();
+
+    const req = httpMock.expectOne((r) => r.url === 'https://api.test/tasks');
+    expect(req.request.params.get('boardId')).toBe('roadmap');
+    req.flush([]);
   });
 
-  it('finds a single task by board and id', () => {
-    expect(service.getTask('roadmap', 'q1-goals')?.title).toBe('Set Q1 goals');
+  it('GETs a single task by id', () => {
+    service.get('q1-goals').subscribe();
+
+    const req = httpMock.expectOne('https://api.test/tasks/q1-goals');
+    expect(req.request.method).toBe('GET');
+    req.flush(dto);
   });
 
-  it('returns undefined for a task id that does not exist on that board', () => {
-    expect(service.getTask('roadmap', 'not-real')).toBeUndefined();
+  it('POSTs a new task with its board id in the body', () => {
+    let created: TaskDto | undefined;
+    service
+      .create('roadmap', { title: 'Q1 goals', description: '', status: 'todo', dueDate: '', subtasks: [] })
+      .subscribe((task) => (created = task));
+
+    const req = httpMock.expectOne('https://api.test/tasks');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toMatchObject({ boardId: 'roadmap', title: 'Q1 goals' });
+    req.flush(dto);
+
+    expect(created?.id).toBe('q1-goals');
   });
 
-  describe('otherTitles', () => {
-    it('lists every title on the board when nothing is excluded', () => {
-      expect(service.otherTitles('roadmap', null)).toEqual([
-        'Set Q1 goals',
-        'Prioritize features',
-        'Set Q2 goals',
-        'Review roadmap risks',
-      ]);
-    });
+  it('PATCHes only the changed fields', () => {
+    service.update('q1-goals', { status: 'done' }).subscribe();
 
-    it('excludes the given task id', () => {
-      expect(service.otherTitles('roadmap', 'q1-goals')).toEqual([
-        'Prioritize features',
-        'Set Q2 goals',
-        'Review roadmap risks',
-      ]);
-    });
+    const req = httpMock.expectOne('https://api.test/tasks/q1-goals');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ status: 'done' });
+    req.flush({ ...dto, status: 'done' });
   });
 
-  describe('addTask', () => {
-    it('appends a new task to the board with a generated id', () => {
-      const added = service.addTask('roadmap', { title: 'New task', description: '', status: 'todo', dueDate: '', subtasks: [] });
+  it('DELETEs a task by id', () => {
+    let completed = false;
+    service.delete('q1-goals').subscribe({ complete: () => (completed = true) });
 
-      expect(added.id).toBeTruthy();
-      expect(service.getTasks('roadmap').map((task) => task.id)).toContain(added.id);
-    });
+    const req = httpMock.expectOne('https://api.test/tasks/q1-goals');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
 
-    it('does not affect tasks on other boards', () => {
-      const before = service.getTasks('platform-launch');
-
-      service.addTask('roadmap', { title: 'New task', description: '', status: 'todo', dueDate: '', subtasks: [] });
-
-      expect(service.getTasks('platform-launch')).toEqual(before);
-    });
-
-    it('generates distinct ids for two tasks with the same title', () => {
-      const first = service.addTask('roadmap', { title: 'Duplicate', description: '', status: 'todo', dueDate: '', subtasks: [] });
-      const second = service.addTask('roadmap', { title: 'Duplicate', description: '', status: 'todo', dueDate: '', subtasks: [] });
-
-      expect(first.id).not.toBe(second.id);
-    });
+    expect(completed).toBe(true);
   });
 
-  describe('the BehaviorSubject-backed Observable API', () => {
-    it('getTasks$ emits the current tasks for a board to a new subscriber', async () => {
-      const tasks = await firstValueFrom(service.getTasks$('roadmap'));
-      expect(tasks.map((task) => task.id)).toEqual([
-        'q1-goals',
-        'prioritize-features',
-        'q2-goals',
-        'review-roadmap-risks',
-      ]);
-    });
+  it('URL-encodes task ids', () => {
+    service.get('a/b c').subscribe();
 
-    it('getTask$ emits a single task by board and id', async () => {
-      const task = await firstValueFrom(service.getTask$('roadmap', 'q1-goals'));
-      expect(task?.title).toBe('Set Q1 goals');
-    });
-
-    it('streams a new value on getTasks$ after addTask, without re-subscribing', async () => {
-      const emissions: number[] = [];
-      const subscription = service.getTasks$('roadmap').subscribe((tasks) => emissions.push(tasks.length));
-
-      service.addTask('roadmap', { title: 'New task', description: '', status: 'todo', dueDate: '', subtasks: [] });
-      subscription.unsubscribe();
-
-      expect(emissions).toEqual([4, 5]);
-    });
-
-    it('boardTasks$ and the synchronous getters stay consistent — same BehaviorSubject, two ways to read it', async () => {
-      const viaObservable = await firstValueFrom(service.boardTasks$);
-      expect(viaObservable['roadmap']).toEqual(service.getTasks('roadmap'));
-    });
+    httpMock.expectOne('https://api.test/tasks/a%2Fb%20c').flush(dto);
   });
 
-  describe('updateTask', () => {
-    it('applies only the given changes, leaving other fields on the same task untouched', () => {
-      service.updateTask('roadmap', 'q1-goals', { status: 'done' });
+  it('is cold — nothing is sent until someone subscribes', () => {
+    service.list();
+    httpMock.expectNone('https://api.test/tasks');
+  });
 
-      const updated = service.getTask('roadmap', 'q1-goals');
-      expect(updated?.status).toBe('done');
-      expect(updated?.title).toBe('Set Q1 goals');
-    });
+  it('passes HTTP errors through to the subscriber', () => {
+    let status: number | undefined;
+    service.get('missing').subscribe({ error: (e) => (status = e.status) });
 
-    it('does not affect other tasks on the same board', () => {
-      const otherBefore = service.getTask('roadmap', 'prioritize-features');
+    httpMock.expectOne('https://api.test/tasks/missing').flush({ message: 'nope' }, { status: 404, statusText: 'Not Found' });
 
-      service.updateTask('roadmap', 'q1-goals', { title: 'Renamed', status: 'done' });
-
-      expect(service.getTask('roadmap', 'prioritize-features')).toEqual(otherBefore);
-    });
-
-    it('does not affect tasks on other boards', () => {
-      const otherBoardBefore = service.getTasks('platform-launch');
-
-      service.updateTask('roadmap', 'q1-goals', { title: 'Renamed' });
-
-      expect(service.getTasks('platform-launch')).toEqual(otherBoardBefore);
-    });
-
-    it('is a no-op when the task id does not exist on that board', () => {
-      const before = service.getTasks('roadmap');
-
-      service.updateTask('roadmap', 'not-real', { title: 'Ghost' });
-
-      expect(service.getTasks('roadmap')).toEqual(before);
-    });
+    expect(status).toBe(404);
   });
 });
