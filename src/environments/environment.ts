@@ -1,7 +1,9 @@
 // Development build. `useMockApi` swaps the real network for the in-memory backend in
 // core/api/mock-api.interceptor.ts, so the app is fully usable without running a server.
 // To point at a real backend instead, set `useMockApi: false` and `apiUrl` to its base URL.
-export const environment = {
+import type { Environment } from './environment.model';
+
+export const environment: Environment = {
   production: false,
   apiUrl: '/api',
   useMockApi: true,
@@ -9,4 +11,3 @@ export const environment = {
   mockLatencyMs: 500,
 };
 
-export type Environment = typeof environment;

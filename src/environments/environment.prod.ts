@@ -1,4 +1,4 @@
-import type { Environment } from './environment';
+import type { Environment } from './environment.model';
 
 // Production build — swapped in for environment.ts by the `fileReplacements` entry in angular.json.
 // There is no hosted backend for this lab, so the deployed app uses the in-memory mock API too;
