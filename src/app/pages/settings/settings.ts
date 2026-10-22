@@ -1,4 +1,4 @@
-import { Component, effect, inject } from '@angular/core';
+import { Component, computed, effect, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { BoardService } from '../../features/board/board.service';
@@ -22,10 +22,10 @@ export class Settings implements ComponentWithUnsavedChanges {
   private readonly notificationService = inject(NotificationService);
   private readonly boardService = inject(BoardService);
 
-  protected readonly boardOptions: SelectFieldOption[] = [
+  protected readonly boardOptions = computed<SelectFieldOption[]>(() => [
     { value: '', label: 'None — go to Settings after login' },
-    ...this.boardService.boardIds.map((boardId) => ({ value: boardId, label: boardId })),
-  ];
+    ...this.boardService.boardIds().map((boardId) => ({ value: boardId, label: boardId })),
+  ]);
 
   readonly form = this.fb.nonNullable.group({
     displayName: 'NZIBUKA',
@@ -53,7 +53,9 @@ export class Settings implements ComponentWithUnsavedChanges {
     effect(() => {
       const persistSuccessNotices = this.notificationService.persistSuccess();
       if (!this.form.controls.persistSuccessNotices.dirty) {
-        this.form.controls.persistSuccessNotices.setValue(persistSuccessNotices, { emitEvent: false });
+        this.form.controls.persistSuccessNotices.setValue(persistSuccessNotices, {
+          emitEvent: false,
+        });
       }
     });
     effect(() => {
@@ -74,7 +76,8 @@ export class Settings implements ComponentWithUnsavedChanges {
   }
 
   save(): void {
-    const { theme, confirmBeforeDelete, persistSuccessNotices, defaultBoardId } = this.form.getRawValue();
+    const { theme, confirmBeforeDelete, persistSuccessNotices, defaultBoardId } =
+      this.form.getRawValue();
     this.themeService.setTheme(theme);
     this.preferencesService.setConfirmBeforeDelete(confirmBeforeDelete);
     this.preferencesService.setDefaultBoardId(defaultBoardId);

@@ -1,9 +1,9 @@
 <aside class="board-sidebar" [class.board-sidebar--collapsed]="collapsed()">
   <div class="board-sidebar__inner">
-    <p class="board-sidebar__heading">All boards ({{ boardIds.length }})</p>
+    <p class="board-sidebar__heading">All boards ({{ boardIds().length }})</p>
     <nav aria-label="Boards">
       <ul class="board-sidebar__list">
-        @for (boardId of boardIds; track boardId) {
+        @for (boardId of boardIds(); track boardId) {
           <li>
             <a
               class="board-sidebar__link"

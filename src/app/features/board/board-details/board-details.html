@@ -1,4 +1,10 @@
-@if (boardExists()) {
+@if (!dataStatus.ready()) {
+  <app-data-state
+    [error]="dataStatus.error()"
+    loadingLabel="Loading board…"
+    (retry)="dataStatus.retry()"
+  />
+} @else if (boardExists()) {
   <div class="board-page">
     <app-board-sidebar />
 

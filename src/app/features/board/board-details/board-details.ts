@@ -1,9 +1,11 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { Store } from '@ngrx/store';
+import { DataState } from '../../../shared/data-state/data-state';
 import { SelectField, SelectFieldOption } from '../../../shared/select-field/select-field';
 import { NotFound } from '../../../pages/not-found/not-found';
 import { BoardSidebar } from '../board-sidebar/board-sidebar';
+import { BoardDataStatus } from '../board-data-status';
 import { BoardService } from '../board.service';
 import { Task } from '../board-data';
 import { TaskEntity } from '../store/task.model';
@@ -16,7 +18,7 @@ const STATUS_COLUMNS: { status: Task['status']; label: string }[] = [
 ];
 
 @Component({
-  imports: [RouterLink, RouterOutlet, SelectField, NotFound, BoardSidebar],
+  imports: [RouterLink, RouterOutlet, SelectField, NotFound, BoardSidebar, DataState],
   selector: 'app-board-details',
   styleUrl: './board-details.css',
   templateUrl: './board-details.html',
@@ -26,14 +28,15 @@ export class BoardDetails {
   private readonly route = inject(ActivatedRoute);
   private readonly store = inject(Store);
   private readonly boardService = inject(BoardService);
+  protected readonly dataStatus = inject(BoardDataStatus);
 
   readonly boardId = input('');
   readonly status = input('all');
   readonly sort = input<'title' | 'status'>('title');
 
-  // Board ids come from a fixed fixture list, so a mistyped/stale URL (e.g. a bookmarked
-  // board that got removed) never matches one — show the same 404 as an unmatched route
-  // instead of an empty board shell with no tasks.
+  // Board ids come from the API, so a mistyped or stale URL (e.g. a bookmarked board that was
+  // deleted) never matches one — show the same 404 as an unmatched route instead of an empty
+  // board shell. Only meaningful once the boards have loaded; the template waits on that first.
   readonly boardExists = computed(() => this.boardService.boardExists(this.boardId()));
 
   readonly statusOptions: SelectFieldOption[] = [
@@ -72,7 +75,9 @@ export class BoardDetails {
     const status = this.effectiveStatus();
     const tasks = this.tasks();
     const visibleColumns =
-      status === 'all' ? STATUS_COLUMNS : STATUS_COLUMNS.filter((column) => column.status === status);
+      status === 'all'
+        ? STATUS_COLUMNS
+        : STATUS_COLUMNS.filter((column) => column.status === status);
     return visibleColumns.map((column) => ({
       ...column,
       tasks: tasks.filter((task) => task.status === column.status),

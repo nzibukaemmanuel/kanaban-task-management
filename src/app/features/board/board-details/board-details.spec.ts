@@ -3,7 +3,7 @@ import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { BoardDetails } from './board-details';
 import { TaskActions } from '../store/task.actions';
-import { provideTaskStoreForTests } from '../store/testing';
+import { loadBoardsForTests, provideTaskStoreForTests } from '../store/testing';
 
 describe('BoardDetails', () => {
   let component: BoardDetails;
@@ -17,7 +17,7 @@ describe('BoardDetails', () => {
 
     fixture = TestBed.createComponent(BoardDetails);
     component = fixture.componentInstance;
-    await fixture.whenStable();
+    await loadBoardsForTests();
   });
 
   it('should create', () => {
@@ -100,7 +100,7 @@ describe('BoardDetails', () => {
     expect(component.boardExists()).toBe(true);
   });
 
-  it('reflects an update dispatched through the store without needing a reload', () => {
+  it('reflects an update dispatched through the store without needing a reload', async () => {
     fixture.componentRef.setInput('boardId', 'platform-launch');
     const store = TestBed.inject(Store);
 
@@ -112,7 +112,9 @@ describe('BoardDetails', () => {
       }),
     );
 
-    expect(component.tasks().map((t) => t.title)).toContain('Write launch docs (v2)');
+    await vi.waitFor(() =>
+      expect(component.tasks().map((t) => t.title)).toContain('Write launch docs (v2)'),
+    );
   });
 
   it('is unaffected by an edit made to a task on a different board', () => {

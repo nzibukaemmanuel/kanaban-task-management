@@ -34,7 +34,7 @@
   <label>
     Default board after login:
     <app-select-field
-      [options]="boardOptions"
+      [options]="boardOptions()"
       [value]="form.controls.defaultBoardId.value"
       ariaLabel="Default board after login"
       (valueChange)="setDefaultBoardId($event)"
