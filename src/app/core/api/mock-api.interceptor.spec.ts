@@ -1,4 +1,9 @@
-import { HttpClient, HttpErrorResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
+import {
+  HttpClient,
+  HttpErrorResponse,
+  provideHttpClient,
+  withInterceptors,
+} from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -37,7 +42,9 @@ describe('mockApiInterceptor', () => {
   });
 
   it('filters tasks by boardId', async () => {
-    const tasks = await firstValueFrom(http.get<TaskDto[]>('/api/tasks', { params: { boardId: 'platform-launch' } }));
+    const tasks = await firstValueFrom(
+      http.get<TaskDto[]>('/api/tasks', { params: { boardId: 'platform-launch' } }),
+    );
     expect(tasks.length).toBeGreaterThan(0);
     expect(tasks.every((task) => task.boardId === 'platform-launch')).toBe(true);
   });
@@ -55,7 +62,9 @@ describe('mockApiInterceptor', () => {
     );
     expect(created.id).toContain('write-release-notes');
 
-    const updated = await firstValueFrom(http.patch<TaskDto>(`/api/tasks/${created.id}`, { status: 'done' }));
+    const updated = await firstValueFrom(
+      http.patch<TaskDto>(`/api/tasks/${created.id}`, { status: 'done' }),
+    );
     expect(updated.status).toBe('done');
     expect(updated.title).toBe('Write release notes');
 
@@ -103,9 +112,13 @@ describe('mockApiInterceptor', () => {
       http.post('/api/tasks', { boardId: 'sandbox', title: 'Temp task', status: 'todo' }),
     );
     await firstValueFrom(http.delete('/api/boards/sandbox'));
-    const tasks = await firstValueFrom(http.get<TaskDto[]>('/api/tasks', { params: { boardId: 'sandbox' } }));
+    const tasks = await firstValueFrom(
+      http.get<TaskDto[]>('/api/tasks', { params: { boardId: 'sandbox' } }),
+    );
     expect(tasks).toEqual([]);
-    const duplicate = await failureOf(firstValueFrom(http.post('/api/boards', { id: 'platform-launch' })));
+    const duplicate = await failureOf(
+      firstValueFrom(http.post('/api/boards', { id: 'platform-launch' })),
+    );
     expect(duplicate.status).toBe(409);
   });
 

@@ -51,9 +51,13 @@ export class TaskEffects {
       ofType(TaskActions.updateTask),
       concatMap(({ taskId, changes }) =>
         this.taskService.update(taskId, changes).pipe(
-          map((updated) => TaskActions.updateTaskSuccess({ update: { id: taskId, changes: updated } })),
+          map((updated) =>
+            TaskActions.updateTaskSuccess({ update: { id: taskId, changes: updated } }),
+          ),
           catchError((error: unknown) =>
-            of(TaskActions.updateTaskFailure({ error: describeHttpError(error, 'update the task') })),
+            of(
+              TaskActions.updateTaskFailure({ error: describeHttpError(error, 'update the task') }),
+            ),
           ),
         ),
       ),
@@ -67,7 +71,9 @@ export class TaskEffects {
         this.taskService.delete(taskId).pipe(
           map(() => TaskActions.deleteTaskSuccess({ taskId })),
           catchError((error: unknown) =>
-            of(TaskActions.deleteTaskFailure({ error: describeHttpError(error, 'delete the task') })),
+            of(
+              TaskActions.deleteTaskFailure({ error: describeHttpError(error, 'delete the task') }),
+            ),
           ),
         ),
       ),

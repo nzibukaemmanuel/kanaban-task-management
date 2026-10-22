@@ -58,14 +58,20 @@ describe('taskReducer', () => {
   it('raises the saving flag while a write is in flight and clears the last error', () => {
     const before: TaskState = { ...seededTaskState(), error: 'old' };
 
-    const state = taskReducer(before, TaskActions.deleteTask({ boardId: 'roadmap', taskId: 'q1-goals' }));
+    const state = taskReducer(
+      before,
+      TaskActions.deleteTask({ boardId: 'roadmap', taskId: 'q1-goals' }),
+    );
 
     expect(state.saving).toBe(true);
     expect(state.error).toBeNull();
   });
 
   it('adds a new entity on Add Task Success and lowers the saving flag', () => {
-    const saving = taskReducer(seededTaskState(), TaskActions.addTask({ boardId: 'roadmap', task }));
+    const saving = taskReducer(
+      seededTaskState(),
+      TaskActions.addTask({ boardId: 'roadmap', task }),
+    );
 
     const state = taskReducer(saving, TaskActions.addTaskSuccess({ task }));
 
@@ -84,13 +90,19 @@ describe('taskReducer', () => {
   });
 
   it('removes the entity on Delete Task Success', () => {
-    const state = taskReducer(seededTaskState(), TaskActions.deleteTaskSuccess({ taskId: 'q1-goals' }));
+    const state = taskReducer(
+      seededTaskState(),
+      TaskActions.deleteTaskSuccess({ taskId: 'q1-goals' }),
+    );
 
     expect(state.entities['q1-goals']).toBeUndefined();
   });
 
   it('keeps the data, records the error and lowers saving on a write Failure', () => {
-    const saving = taskReducer(seededTaskState(), TaskActions.deleteTask({ boardId: 'roadmap', taskId: 'q1-goals' }));
+    const saving = taskReducer(
+      seededTaskState(),
+      TaskActions.deleteTask({ boardId: 'roadmap', taskId: 'q1-goals' }),
+    );
 
     const state = taskReducer(saving, TaskActions.deleteTaskFailure({ error: 'nope' }));
 

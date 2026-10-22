@@ -1,4 +1,10 @@
-import { HttpErrorResponse, HttpEvent, HttpInterceptorFn, HttpRequest, HttpResponse } from '@angular/common/http';
+import {
+  HttpErrorResponse,
+  HttpEvent,
+  HttpInterceptorFn,
+  HttpRequest,
+  HttpResponse,
+} from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Observable, delay, of, throwError } from 'rxjs';
 import { API_BASE_URL, MOCK_API_LATENCY_MS } from './api.config';
@@ -58,7 +64,8 @@ function respond(req: HttpRequest<unknown>, path: string, db: MockApiDb): HttpRe
 }
 
 function toHttpError(req: HttpRequest<unknown>, error: unknown): HttpErrorResponse {
-  const apiError = error instanceof MockApiError ? error : new MockApiError(500, 'Mock API crashed.');
+  const apiError =
+    error instanceof MockApiError ? error : new MockApiError(500, 'Mock API crashed.');
   return new HttpErrorResponse({
     status: apiError.status,
     statusText: apiError.message,

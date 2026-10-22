@@ -10,11 +10,15 @@ describe('describeHttpError', () => {
   });
 
   it('prefers the message the server sent for client errors', () => {
-    expect(describeHttpError(failure(409, { message: 'Title taken.' }), 'save the task')).toBe('Title taken.');
+    expect(describeHttpError(failure(409, { message: 'Title taken.' }), 'save the task')).toBe(
+      'Title taken.',
+    );
   });
 
   it('falls back to a generic message for a 404 with no body', () => {
-    expect(describeHttpError(failure(404), 'load the task')).toBe("Couldn't load the task. That item no longer exists.");
+    expect(describeHttpError(failure(404), 'load the task')).toBe(
+      "Couldn't load the task. That item no longer exists.",
+    );
   });
 
   it('hides server internals behind a retry hint for 5xx', () => {

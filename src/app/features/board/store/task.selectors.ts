@@ -11,7 +11,7 @@ export const selectAllTasks = createSelector(selectTaskState, selectAll);
 export const selectTasksLoaded = createSelector(selectTaskState, (state) => state.loaded);
 export const selectTasksLoading = createSelector(selectTaskState, (state) => state.loading);
 export const selectTasksSaving = createSelector(selectTaskState, (state) => state.saving);
-export const selectTasksError =createSelector(selectTaskState, (state) => state.error);
+export const selectTasksError = createSelector(selectTaskState, (state) => state.error);
 
 // Parameterized selector factories (rather than a single selector taking boardId as state) —
 // each call builds a fresh memoized selector, which is what lets components keep one stable

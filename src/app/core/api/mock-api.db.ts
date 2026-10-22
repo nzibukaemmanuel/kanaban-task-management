@@ -18,8 +18,8 @@ const FAIL_FLAG_KEY = 'kanban-mock-api-fail';
 @Injectable({ providedIn: 'root' })
 export class MockApiDb {
   private boards: BoardDto[] = BOARD_IDS.map((id) => ({ id }));
-  private tasks: TaskDto[] = Object.entries(structuredClone(BOARD_TASKS)).flatMap(([boardId, tasks]) =>
-    tasks.map((task) => ({ ...task, boardId })),
+  private tasks: TaskDto[] = Object.entries(structuredClone(BOARD_TASKS)).flatMap(
+    ([boardId, tasks]) => tasks.map((task) => ({ ...task, boardId })),
   );
   private nextSuffix = 0;
 
@@ -62,7 +62,8 @@ export class MockApiDb {
   }
 
   listTasks(boardId: string | null): TaskDto[] {
-    const matching = boardId === null ? this.tasks : this.tasks.filter((task) => task.boardId === boardId);
+    const matching =
+      boardId === null ? this.tasks : this.tasks.filter((task) => task.boardId === boardId);
     return structuredClone(matching);
   }
 
@@ -122,7 +123,10 @@ export class MockApiDb {
 
   private assertTitleFree(boardId: string, title: string, exceptId: string | null): void {
     const clash = this.tasks.some(
-      (task) => task.boardId === boardId && task.id !== exceptId && task.title.toLowerCase() === title.toLowerCase(),
+      (task) =>
+        task.boardId === boardId &&
+        task.id !== exceptId &&
+        task.title.toLowerCase() === title.toLowerCase(),
     );
     if (clash) {
       throw new MockApiError(409, `A task titled "${title}" already exists on this board.`);
@@ -131,5 +135,11 @@ export class MockApiDb {
 }
 
 function slugify(title: string): string {
-  return title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'task';
+  return (
+    title
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '') || 'task'
+  );
 }

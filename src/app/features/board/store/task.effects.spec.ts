@@ -16,7 +16,13 @@ describe('TaskEffects', () => {
   let effects: TaskEffects;
   let taskService: TaskService;
 
-  const newTask = { title: 'Effect-added task', description: '', status: 'todo' as const, dueDate: '', subtasks: [] };
+  const newTask = {
+    title: 'Effect-added task',
+    description: '',
+    status: 'todo' as const,
+    dueDate: '',
+    subtasks: [],
+  };
   const serverError = () => throwError(() => new HttpErrorResponse({ status: 500 }));
 
   beforeEach(() => {
@@ -71,7 +77,9 @@ describe('TaskEffects', () => {
   });
 
   it('addTask$ surfaces a server rejection (duplicate title) as a Failure with the server message', async () => {
-    actions$.next(TaskActions.addTask({ boardId: 'roadmap', task: { ...newTask, title: 'Set Q1 goals' } }));
+    actions$.next(
+      TaskActions.addTask({ boardId: 'roadmap', task: { ...newTask, title: 'Set Q1 goals' } }),
+    );
 
     const result = await firstValueFrom(effects.addTask$);
 
@@ -83,7 +91,11 @@ describe('TaskEffects', () => {
 
   it('updateTask$ patches the task and reports an Update<TaskEntity>', async () => {
     actions$.next(
-      TaskActions.updateTask({ boardId: 'roadmap', taskId: 'q1-goals', changes: { status: 'done' } }),
+      TaskActions.updateTask({
+        boardId: 'roadmap',
+        taskId: 'q1-goals',
+        changes: { status: 'done' },
+      }),
     );
 
     const result = await firstValueFrom(effects.updateTask$);
@@ -96,7 +108,9 @@ describe('TaskEffects', () => {
   });
 
   it('updateTask$ reports a Failure when the task no longer exists', async () => {
-    actions$.next(TaskActions.updateTask({ boardId: 'roadmap', taskId: 'ghost', changes: { status: 'done' } }));
+    actions$.next(
+      TaskActions.updateTask({ boardId: 'roadmap', taskId: 'ghost', changes: { status: 'done' } }),
+    );
 
     const result = await firstValueFrom(effects.updateTask$);
 

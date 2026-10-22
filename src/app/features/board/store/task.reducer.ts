@@ -37,7 +37,9 @@ export const taskReducer = createReducer(
     error: null,
   })),
 
-  on(TaskActions.addTaskSuccess, (state, { task }) => taskAdapter.addOne(task, { ...state, saving: false })),
+  on(TaskActions.addTaskSuccess, (state, { task }) =>
+    taskAdapter.addOne(task, { ...state, saving: false }),
+  ),
   on(TaskActions.updateTaskSuccess, (state, { update }) =>
     taskAdapter.updateOne(update, { ...state, saving: false }),
   ),

@@ -63,7 +63,13 @@ describe('TaskService', () => {
   it('POSTs a new task with its board id in the body', () => {
     let created: TaskDto | undefined;
     service
-      .create('roadmap', { title: 'Q1 goals', description: '', status: 'todo', dueDate: '', subtasks: [] })
+      .create('roadmap', {
+        title: 'Q1 goals',
+        description: '',
+        status: 'todo',
+        dueDate: '',
+        subtasks: [],
+      })
       .subscribe((task) => (created = task));
 
     const req = httpMock.expectOne('https://api.test/tasks');
@@ -109,7 +115,9 @@ describe('TaskService', () => {
     let status: number | undefined;
     service.get('missing').subscribe({ error: (e) => (status = e.status) });
 
-    httpMock.expectOne('https://api.test/tasks/missing').flush({ message: 'nope' }, { status: 404, statusText: 'Not Found' });
+    httpMock
+      .expectOne('https://api.test/tasks/missing')
+      .flush({ message: 'nope' }, { status: 404, statusText: 'Not Found' });
 
     expect(status).toBe(404);
   });

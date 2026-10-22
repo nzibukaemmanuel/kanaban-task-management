@@ -71,7 +71,9 @@ describe('BoardService', () => {
 
   it('exposes a readable error and allows a retry after a failed load', () => {
     service.load();
-    httpMock.expectOne('https://api.test/boards').flush({}, { status: 500, statusText: 'Server Error' });
+    httpMock
+      .expectOne('https://api.test/boards')
+      .flush({}, { status: 500, statusText: 'Server Error' });
 
     expect(service.loaded()).toBe(false);
     expect(service.error()).toContain("Couldn't load boards");
@@ -122,7 +124,9 @@ describe('BoardService', () => {
     httpMock.expectOne('https://api.test/boards').flush(BOARDS);
 
     service.create('roadmap').subscribe({ error: () => undefined });
-    httpMock.expectOne('https://api.test/boards').flush({ message: 'exists' }, { status: 409, statusText: 'Conflict' });
+    httpMock
+      .expectOne('https://api.test/boards')
+      .flush({ message: 'exists' }, { status: 409, statusText: 'Conflict' });
 
     expect(service.boardIds()).toEqual(['platform-launch', 'marketing-plan', 'roadmap']);
   });
