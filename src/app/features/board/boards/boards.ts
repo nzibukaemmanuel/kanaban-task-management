@@ -61,7 +61,7 @@ export class Boards {
     if (!boardId) {
       return;
     }
-    this.router.navigate(['/boards', boardId]);
+    void this.router.navigate(['/boards', boardId]);
   }
 
   createBoard(): void {
