@@ -47,6 +47,10 @@ export const taskReducer = createReducer(
     taskAdapter.removeOne(taskId, { ...state, saving: false }),
   ),
 
+  on(TaskActions.boardRemoved, (state, { boardId }) =>
+    taskAdapter.removeMany((task) => task.boardId === boardId, state),
+  ),
+
   on(
     TaskActions.addTaskFailure,
     TaskActions.updateTaskFailure,

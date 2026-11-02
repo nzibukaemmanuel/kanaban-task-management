@@ -32,6 +32,15 @@
   margin-bottom: var(--space-8);
 }
 
+.new-board {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
 .board-list {
   flex: 1 1 auto;
   min-height: 0;
@@ -53,7 +62,9 @@
   background: var(--color-card);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-resting);
-  transition: box-shadow var(--transition-base), transform var(--transition-base);
+  transition:
+    box-shadow var(--transition-base),
+    transform var(--transition-base);
 }
 
 .board-card:hover {

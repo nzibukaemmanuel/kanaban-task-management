@@ -1,7 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { Store } from '@ngrx/store';
-import { firstValueFrom } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { firstValueFrom, throwError } from 'rxjs';
+import { AuthService } from '../../../core/auth.service';
+import { NotificationService } from '../../../core/notification.service';
 import { BoardService } from '../board.service';
 import { Boards } from './boards';
 import { TaskActions } from '../store/task.actions';
@@ -113,5 +116,88 @@ describe('Boards loading and error states', () => {
       fixture.detectChanges();
       expect(text(fixture)).toContain('Select a board to view its details.');
     });
+  });
+});
+
+describe('Boards — creating a board', () => {
+  let fixture: ComponentFixture<Boards>;
+  let component: Boards;
+
+  beforeEach(async () => {
+    TestBed.configureTestingModule({
+      imports: [Boards],
+      providers: [provideRouter([]), provideTaskStoreForTests()],
+    });
+    TestBed.inject(AuthService).login('MANNAZ', 'NZIBUKA123');
+    fixture = TestBed.createComponent(Boards);
+    component = fixture.componentInstance;
+    await loadBoardsForTests();
+    fixture.detectChanges();
+  });
+
+  const el = (selector: string) => (fixture.nativeElement as HTMLElement).querySelector(selector);
+
+  it('shows the add-board form only to a logged-in user', () => {
+    expect(el('form.new-board')).not.toBeNull();
+
+    TestBed.inject(AuthService).logout();
+    fixture.detectChanges();
+
+    expect(el('form.new-board')).toBeNull();
+  });
+
+  it('creates the board with a slugged id through the API and tells the user', async () => {
+    component.newBoardForm.controls.name.setValue('Q4 Launch!');
+
+    component.createBoard();
+    expect(component.creating()).toBe(true);
+
+    await vi.waitFor(() =>
+      expect(TestBed.inject(BoardService).boardExists('q4-launch')).toBe(true),
+    );
+    expect(TestBed.inject(NotificationService).notice()).toEqual({
+      message: 'Board "q4-launch" was created.',
+      kind: 'success',
+    });
+    expect(component.creating()).toBe(false);
+    expect(component.newBoardForm.controls.name.value).toBe('');
+  });
+
+  it('rejects an empty name, an unusable name and a name that matches an existing board', () => {
+    const name = component.newBoardForm.controls.name;
+
+    name.setValue('');
+    expect(name.hasError('required')).toBe(true);
+    name.setValue('!!!');
+    expect(name.hasError('unusableName')).toBe(true);
+    name.setValue(' RoadMap ');
+    expect(name.hasError('duplicateBoard')).toBe(true);
+    name.setValue('x'.repeat(41));
+    expect(name.hasError('maxlength')).toBe(true);
+  });
+
+  it('does not call the API for an invalid name', () => {
+    const create = vi.spyOn(TestBed.inject(BoardService), 'create');
+    component.newBoardForm.controls.name.setValue('roadmap');
+
+    component.createBoard();
+
+    expect(create).not.toHaveBeenCalled();
+    expect(component.newBoardForm.controls.name.touched).toBe(true);
+  });
+
+  it('shows the server message and keeps the typed name when creation fails', async () => {
+    vi.spyOn(TestBed.inject(BoardService), 'create').mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 500 })),
+    );
+    component.newBoardForm.controls.name.setValue('Fresh board');
+
+    component.createBoard();
+
+    await vi.waitFor(() =>
+      expect(TestBed.inject(NotificationService).notice()?.kind).toBe('error'),
+    );
+    expect(component.creating()).toBe(false);
+    expect(component.newBoardForm.controls.name.value).toBe('Fresh board');
   });
 });

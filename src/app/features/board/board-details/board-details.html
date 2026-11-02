@@ -36,6 +36,14 @@
           </label>
 
           <a class="btn" [routerLink]="['new-task']">+ Add New Task</a>
+          <button
+            type="button"
+            class="btn-secondary"
+            [disabled]="deletingBoard()"
+            (click)="deleteBoard()"
+          >
+            {{ deletingBoard() ? 'Deleting…' : 'Delete board' }}
+          </button>
         </div>
       </div>
 

@@ -1,6 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter, Router } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Store } from '@ngrx/store';
+import { throwError } from 'rxjs';
+import { NotificationService } from '../../../core/notification.service';
+import { BoardService } from '../board.service';
+import { selectAllTasks } from '../store/task.selectors';
 import { BoardDetails } from './board-details';
 import { TaskActions } from '../store/task.actions';
 import { fixtureTaskValue, loadBoardsForTests, provideTaskStoreForTests } from '../store/testing';
@@ -108,7 +113,9 @@ describe('BoardDetails', () => {
       TaskActions.updateTask({
         boardId: 'platform-launch',
         taskId: 'write-docs',
-        task: fixtureTaskValue('platform-launch', 'write-docs', { title: 'Write launch docs (v2)' }),
+        task: fixtureTaskValue('platform-launch', 'write-docs', {
+          title: 'Write launch docs (v2)',
+        }),
       }),
     );
 
@@ -145,5 +152,75 @@ describe('BoardDetails', () => {
       queryParams: { status: 'done' },
       queryParamsHandling: 'merge',
     });
+  });
+});
+
+describe('BoardDetails — deleting a board', () => {
+  let component: BoardDetails;
+
+  beforeEach(async () => {
+    TestBed.configureTestingModule({
+      imports: [BoardDetails],
+      providers: [provideRouter([]), provideTaskStoreForTests()],
+    });
+    const fixture = TestBed.createComponent(BoardDetails);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('boardId', 'roadmap');
+    await loadBoardsForTests();
+  });
+
+  const boards = () => TestBed.inject(BoardService);
+  const roadmapTasks = () =>
+    TestBed.inject(Store)
+      .selectSignal(selectAllTasks)()
+      .filter((task) => task.boardId === 'roadmap');
+
+  it('asks for confirmation naming the board and how many tasks go with it', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    component.deleteBoard();
+
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('"roadmap" and its 4 tasks'));
+  });
+
+  it('does nothing when the user declines', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    component.deleteBoard();
+
+    expect(boards().boardExists('roadmap')).toBe(true);
+    expect(navigateSpy).not.toHaveBeenCalled();
+  });
+
+  it('deletes via the API, drops the board and its tasks locally, and returns to the list', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    component.deleteBoard();
+
+    await vi.waitFor(() => expect(navigateSpy).toHaveBeenCalledWith(['/boards']));
+    expect(boards().boardExists('roadmap')).toBe(false);
+    expect(roadmapTasks()).toEqual([]);
+    expect(TestBed.inject(NotificationService).notice()?.message).toBe(
+      'Board "roadmap" was deleted.',
+    );
+  });
+
+  it('keeps the board and its tasks and shows the error when the server fails', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    vi.spyOn(boards(), 'delete').mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 500 })),
+    );
+
+    component.deleteBoard();
+
+    await vi.waitFor(() =>
+      expect(TestBed.inject(NotificationService).notice()?.kind).toBe('error'),
+    );
+    expect(boards().boardExists('roadmap')).toBe(true);
+    expect(roadmapTasks().length).toBe(4);
+    expect(navigateSpy).not.toHaveBeenCalled();
   });
 });

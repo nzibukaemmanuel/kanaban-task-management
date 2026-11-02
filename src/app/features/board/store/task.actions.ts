@@ -26,5 +26,9 @@ export const TaskActions = createActionGroup({
     'Delete Task': props<{ boardId: string; taskId: string }>(),
     'Delete Task Success': props<{ taskId: string }>(),
     'Delete Task Failure': props<{ error: string }>(),
+
+    // Dispatched after the API confirms a board delete: the server removed the board's tasks with
+    // it, so the store drops them too instead of refetching everything.
+    'Board Removed': props<{ boardId: string }>(),
   },
 });

@@ -1,6 +1,8 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { Store } from '@ngrx/store';
+import { describeHttpError } from '../../../core/api/api-error';
+import { NotificationService } from '../../../core/notification.service';
 import { DataState } from '../../../shared/data-state/data-state';
 import { SelectField, SelectFieldOption } from '../../../shared/select-field/select-field';
 import { NotFound } from '../../../pages/not-found/not-found';
@@ -9,6 +11,7 @@ import { BoardDataStatus } from '../board-data-status';
 import { BoardService } from '../board.service';
 import { Task } from '../board-data';
 import { TaskEntity } from '../store/task.model';
+import { TaskActions } from '../store/task.actions';
 import { selectAllTasks } from '../store/task.selectors';
 
 const STATUS_COLUMNS: { status: Task['status']; label: string }[] = [
@@ -28,7 +31,9 @@ export class BoardDetails {
   private readonly route = inject(ActivatedRoute);
   private readonly store = inject(Store);
   private readonly boardService = inject(BoardService);
+  private readonly notificationService = inject(NotificationService);
   protected readonly dataStatus = inject(BoardDataStatus);
+  protected readonly deletingBoard = signal(false);
 
   readonly boardId = input('');
   readonly status = input('all');
@@ -93,6 +98,35 @@ export class BoardDetails {
       relativeTo: this.route,
       queryParams: partial,
       queryParamsHandling: 'merge',
+    });
+  }
+
+  // Deleting a board removes all of its tasks, so unlike a single task it always asks first
+  // (the "confirm before delete" preference only covers tasks). Local state is only touched
+  // once the server confirms.
+  deleteBoard(): void {
+    const boardId = this.boardId();
+    // Counted from the whole store, not tasks(), which the status filter may have narrowed.
+    const taskCount = this.allTasks().filter((task) => task.boardId === boardId).length;
+    const detail = taskCount === 0 ? '' : ` and its ${taskCount} task${taskCount === 1 ? '' : 's'}`;
+    if (
+      this.deletingBoard() ||
+      !confirm(`Delete the board "${boardId}"${detail}? This can't be undone.`)
+    ) {
+      return;
+    }
+    this.deletingBoard.set(true);
+    this.boardService.delete(boardId).subscribe({
+      next: () => {
+        this.deletingBoard.set(false);
+        this.store.dispatch(TaskActions.boardRemoved({ boardId }));
+        this.notificationService.success(`Board "${boardId}" was deleted.`);
+        this.router.navigate(['/boards']);
+      },
+      error: (error: unknown) => {
+        this.deletingBoard.set(false);
+        this.notificationService.error(describeHttpError(error, 'delete the board'));
+      },
     });
   }
 

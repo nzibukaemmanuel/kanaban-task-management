@@ -98,6 +98,16 @@ describe('taskReducer', () => {
     expect(state.entities['q1-goals']).toBeUndefined();
   });
 
+  it('drops every task of a removed board and leaves the other boards alone', () => {
+    const before = seededTaskState();
+
+    const state = taskReducer(before, TaskActions.boardRemoved({ boardId: 'roadmap' }));
+
+    expect(Object.values(state.entities).some((t) => t?.boardId === 'roadmap')).toBe(false);
+    expect(state.entities['define-scope']).toBeDefined();
+    expect(state.ids.length).toBeLessThan(before.ids.length);
+  });
+
   it('keeps the data, records the error and lowers saving on a write Failure', () => {
     const saving = taskReducer(
       seededTaskState(),
