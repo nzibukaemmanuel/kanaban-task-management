@@ -4,22 +4,35 @@ This project was generated using [Angular CLI](https://github.com/angular/angula
 
 ## HTTP & API integration
 
-All board and task data now travels over Angular's `HttpClient`. There is no hosted backend for this lab, so a
-**mock API** stands in for one: `core/api/mock-api.interceptor.ts` is an `HttpInterceptorFn` that answers
-`/api/*` requests from an in-memory database (`mock-api.db.ts`, seeded from `board-data.ts`) after a simulated
-latency. Because it sits at the HTTP boundary, the services, effects and components are written exactly as
-they would be against a real server — pointing at one is a config change, not a code change.
+All board and task data travels over Angular's `HttpClient`, against one of two interchangeable backends:
+
+- **In-browser mock API** (default for `ng serve` and the deployed build): `core/api/mock-api.interceptor.ts`
+  answers `/api/*` requests from an in-memory database (`mock-api.db.ts`) after a simulated latency.
+- **Real REST API via json-server** (`npm run api` + `npm run start:local`): a separate process on
+  `http://localhost:3000` serving `server/db.json`, so the browser makes genuine cross-origin HTTP requests
+  (including CORS preflights).
+
+Both are seeded from the same fixture and speak the same REST dialect, so the services, effects and components
+are identical either way — choosing one is a config change, not a code change.
+
+```bash
+npm start               # dev server, in-browser mock API
+npm run api             # terminal 1: json-server on :3000 (works on a throwaway copy of server/db.json)
+npm run start:local     # terminal 2: app pointed at json-server
+npm run generate:db     # rebuild server/db.json from board-data.ts
+```
 
 ### Endpoints
 
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/boards` | list boards |
-| POST / DELETE | `/api/boards`, `/api/boards/:id` | create / delete a board (deleting also removes its tasks) |
+| POST / DELETE | `/api/boards`, `/api/boards/:id` | create / delete a board (deleting also removes its tasks; json-server is asked to cascade with `?_dependent=tasks`) |
 | GET | `/api/tasks?boardId=` | list tasks, optionally for one board |
 | GET | `/api/tasks/:id` | one task |
 | POST | `/api/tasks` | create (server assigns the id; rejects short or duplicate titles) |
-| PATCH | `/api/tasks/:id` | update changed fields |
+| PUT | `/api/tasks/:id` | replace a task with the edited version (the edit form's save) |
+| PATCH | `/api/tasks/:id` | merge a partial update (supported by both backends; the app itself uses PUT) |
 | DELETE | `/api/tasks/:id` | delete |
 
 Failures carry real status codes (400 invalid, 404 missing, 409 duplicate title, 500 server) and a `{ message }`
@@ -50,6 +63,9 @@ component ──dispatch──▶ TaskEffects ──▶ TaskService (HttpClient)
   the unsaved-changes guard still protects edits that failed to save.
 - **Delete:** confirmation first (unless turned off in Settings), then the request; the task disappears from
   every view when the server confirms, with no reload.
+- **Boards:** a logged-in user can add a board from the Boards page (name → slug id, checked for blanks and
+  duplicates) and delete one from its page. Deleting always asks first, names how many tasks go with it, and only
+  updates the UI after the server confirms.
 - **Loading / errors:** boards pages show a spinner until both datasets arrive, and an error with retry if
   either fails. To see the error state locally run `localStorage.setItem('kanban-mock-api-fail', 'true')` in
   the browser console and reload (remove the key to recover).
@@ -61,18 +77,19 @@ component ──dispatch──▶ TaskEffects ──▶ TaskService (HttpClient)
 
 ### Environments (bonus)
 
-`src/environments/environment.ts` (development) and `environment.prod.ts` (production, swapped in by
-`fileReplacements` in `angular.json`) both satisfy `Environment` from `environment.model.ts`:
+Three configurations, all satisfying `Environment` from `environment.model.ts`; `angular.json` swaps the file
+at build time with `fileReplacements`:
 
-| Key | Dev | Prod |
-|---|---|---|
-| `apiUrl` | `/api` | `/api` |
-| `useMockApi` | `true` | `true` |
-| `mockLatencyMs` | 500 | 200 |
+| | `environment.ts` (`ng serve`) | `environment.local.ts` (`-c local`) | `environment.prod.ts` (`ng build`) |
+|---|---|---|---|
+| `apiUrl` | `/api` | `http://localhost:3000` | `/api` |
+| `useMockApi` | `true` | `false` | `true` |
+| `mockLatencyMs` | 500 | 0 | 200 |
 
-To use a real backend, set `useMockApi: false` and `apiUrl` to its base URL (e.g.
-`https://api.example.com`); `app.config.ts` then registers `HttpClient` without the mock interceptor. No
-secrets belong in these files — they ship in the client bundle.
+`provideApi(environment)` (`core/api/api.providers.ts`) is the single place that turns these values into providers:
+the `API_BASE_URL` token plus `HttpClient`, with the mock interceptor only when `useMockApi` is on. To deploy
+against a real backend, set `useMockApi: false` and `apiUrl` to its URL in `environment.prod.ts`. No secrets
+belong in these files — they ship in the client bundle.
 
 ### Testing the API layer
 
@@ -80,6 +97,7 @@ secrets belong in these files — they ship in the client bundle.
 - `task.service.spec.ts` / `board.service.spec.ts` — `HttpTestingController`: verbs, URLs, query params,
   bodies, caching and error pass-through.
 - `task.effects.spec.ts` — each effect against the mock API, plus server-error → `Failure` paths.
+- `api.providers.spec.ts` — environment switching: mock vs. real network, and the three environment files.
 - Component specs cover the success path *and* the failure path (stay on the form / task, show the error).
 
 ## State management
