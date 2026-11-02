@@ -3,7 +3,7 @@ import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { BoardDetails } from './board-details';
 import { TaskActions } from '../store/task.actions';
-import { loadBoardsForTests, provideTaskStoreForTests } from '../store/testing';
+import { fixtureTaskValue, loadBoardsForTests, provideTaskStoreForTests } from '../store/testing';
 
 describe('BoardDetails', () => {
   let component: BoardDetails;
@@ -108,7 +108,7 @@ describe('BoardDetails', () => {
       TaskActions.updateTask({
         boardId: 'platform-launch',
         taskId: 'write-docs',
-        changes: { title: 'Write launch docs (v2)' },
+        task: fixtureTaskValue('platform-launch', 'write-docs', { title: 'Write launch docs (v2)' }),
       }),
     );
 
@@ -126,7 +126,7 @@ describe('BoardDetails', () => {
       TaskActions.updateTask({
         boardId: 'roadmap',
         taskId: 'q1-goals',
-        changes: { title: 'Renamed elsewhere' },
+        task: fixtureTaskValue('roadmap', 'q1-goals', { title: 'Renamed elsewhere' }),
       }),
     );
 

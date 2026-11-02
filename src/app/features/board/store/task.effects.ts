@@ -49,8 +49,8 @@ export class TaskEffects {
   updateTask$ = createEffect(() =>
     this.actions$.pipe(
       ofType(TaskActions.updateTask),
-      concatMap(({ taskId, changes }) =>
-        this.taskService.update(taskId, changes).pipe(
+      concatMap(({ boardId, taskId, task }) =>
+        this.taskService.update(boardId, taskId, task).pipe(
           map((updated) =>
             TaskActions.updateTaskSuccess({ update: { id: taskId, changes: updated } }),
           ),

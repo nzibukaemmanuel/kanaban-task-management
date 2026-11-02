@@ -55,9 +55,13 @@ export class BoardService {
       .pipe(tap((board) => this.ids.update((ids) => [...ids, board.id])));
   }
 
+  // `_dependent=tasks` asks json-server to delete the board's tasks along with it (a real API
+  // would do this itself); the in-browser mock always cascades.
   delete(boardId: string): Observable<void> {
     return this.http
-      .delete<void>(`${this.url}/${encodeURIComponent(boardId)}`)
+      .delete<void>(`${this.url}/${encodeURIComponent(boardId)}`, {
+        params: { _dependent: 'tasks' },
+      })
       .pipe(tap(() => this.ids.update((ids) => ids.filter((id) => id !== boardId))));
   }
 }

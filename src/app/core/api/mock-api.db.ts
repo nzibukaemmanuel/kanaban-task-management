@@ -108,6 +108,32 @@ export class MockApiDb {
     return structuredClone(updated);
   }
 
+  // PUT semantics: the stored task becomes exactly the body, so a field left out is cleared
+  // rather than kept — unlike patchTask, which merges.
+  replaceTask(id: string, input: Partial<TaskCreateDto>): TaskDto {
+    this.requireTask(id);
+    const boardId = input.boardId ?? '';
+    if (!this.boards.some((board) => board.id === boardId)) {
+      throw new MockApiError(404, `Board "${boardId}" doesn't exist.`);
+    }
+    const title = input.title?.trim() ?? '';
+    if (title.length < 3) {
+      throw new MockApiError(400, 'A task title must be at least 3 characters.');
+    }
+    this.assertTitleFree(boardId, title, id);
+    const replaced: TaskDto = {
+      id,
+      boardId,
+      title,
+      description: input.description ?? '',
+      status: input.status ?? 'todo',
+      dueDate: input.dueDate ?? '',
+      subtasks: structuredClone(input.subtasks ?? []),
+    };
+    this.tasks = this.tasks.map((task) => (task.id === id ? replaced : task));
+    return structuredClone(replaced);
+  }
+
   deleteTask(id: string): void {
     this.requireTask(id);
     this.tasks = this.tasks.filter((task) => task.id !== id);

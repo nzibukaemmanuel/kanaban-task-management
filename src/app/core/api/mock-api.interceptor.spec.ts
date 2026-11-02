@@ -73,6 +73,47 @@ describe('mockApiInterceptor', () => {
     expect(after.status).toBe(404);
   });
 
+  it('PUT replaces the whole task, clearing fields the body leaves out', async () => {
+    const replaced = await firstValueFrom(
+      http.put<TaskDto>('/api/tasks/define-scope', {
+        id: 'define-scope',
+        boardId: 'platform-launch',
+        title: 'Define MVP scope (final)',
+        status: 'done',
+      }),
+    );
+
+    expect(replaced).toMatchObject({
+      id: 'define-scope',
+      title: 'Define MVP scope (final)',
+      description: '',
+    });
+    expect(replaced.subtasks).toEqual([]);
+    const stored = await firstValueFrom(http.get<TaskDto>('/api/tasks/define-scope'));
+    expect(stored).toEqual(replaced);
+  });
+
+  it('PUT validates the body and the target', async () => {
+    const tooShort = await failureOf(
+      firstValueFrom(
+        http.put('/api/tasks/define-scope', { boardId: 'platform-launch', title: 'ab' }),
+      ),
+    );
+    expect(tooShort.status).toBe(400);
+    const missing = await failureOf(
+      firstValueFrom(
+        http.put('/api/tasks/ghost', { boardId: 'platform-launch', title: 'Valid title' }),
+      ),
+    );
+    expect(missing.status).toBe(404);
+    const duplicate = await failureOf(
+      firstValueFrom(
+        http.put('/api/tasks/define-scope', { boardId: 'platform-launch', title: 'Design review' }),
+      ),
+    );
+    expect(duplicate.status).toBe(409);
+  });
+
   it('rejects a duplicate title on the same board with 409', async () => {
     const error = await failureOf(
       firstValueFrom(

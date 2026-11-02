@@ -8,7 +8,7 @@ import { PreferencesService } from '../../../core/preferences.service';
 import { TaskDetail } from './task-detail';
 import { TaskService } from '../task.service';
 import { TaskActions } from '../store/task.actions';
-import { provideTaskStoreForTests } from '../store/testing';
+import { fixtureTaskValue, provideTaskStoreForTests } from '../store/testing';
 
 describe('TaskDetail', () => {
   let component: TaskDetail;
@@ -57,7 +57,7 @@ describe('TaskDetail', () => {
       TaskActions.updateTask({
         boardId: 'roadmap',
         taskId: 'q1-goals',
-        changes: { status: 'done' },
+        task: fixtureTaskValue('roadmap', 'q1-goals', { status: 'done' }),
       }),
     );
 

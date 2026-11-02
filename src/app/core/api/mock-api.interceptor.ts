@@ -51,9 +51,8 @@ function respond(req: HttpRequest<unknown>, path: string, db: MockApiDb): HttpRe
     if (!taskId && req.method === 'GET') return ok(db.listTasks(req.params.get('boardId')));
     if (!taskId && req.method === 'POST') return ok(db.createTask(req.body as never), 201);
     if (taskId && req.method === 'GET') return ok(db.getTask(taskId));
-    if (taskId && (req.method === 'PATCH' || req.method === 'PUT')) {
-      return ok(db.patchTask(taskId, req.body as never));
-    }
+    if (taskId && req.method === 'PUT') return ok(db.replaceTask(taskId, req.body as never));
+    if (taskId && req.method === 'PATCH') return ok(db.patchTask(taskId, req.body as never));
     if (taskId && req.method === 'DELETE') {
       db.deleteTask(taskId);
       return ok(null, 204);

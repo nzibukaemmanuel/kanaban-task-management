@@ -80,12 +80,20 @@ describe('TaskService', () => {
     expect(created?.id).toBe('q1-goals');
   });
 
-  it('PATCHes only the changed fields', () => {
-    service.update('q1-goals', { status: 'done' }).subscribe();
+  it('PUTs the whole edited task, including its id and board', () => {
+    service
+      .update('roadmap', 'q1-goals', {
+        title: 'Q1 goals',
+        description: '',
+        status: 'done',
+        dueDate: '',
+        subtasks: [],
+      })
+      .subscribe();
 
     const req = httpMock.expectOne('https://api.test/tasks/q1-goals');
-    expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({ status: 'done' });
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ ...dto, status: 'done' });
     req.flush({ ...dto, status: 'done' });
   });
 

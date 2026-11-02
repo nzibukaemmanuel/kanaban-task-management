@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL, API_ENDPOINTS } from '../../core/api/api.config';
-import { TaskCreateDto, TaskDto, TaskPatchDto } from '../../core/api/api.models';
+import { TaskCreateDto, TaskDto } from '../../core/api/api.models';
 import { Task } from './board-data';
 
 // The only place that knows how tasks are fetched and persisted. Every method is a thin,
@@ -27,8 +27,11 @@ export class TaskService {
     return this.http.post<TaskDto>(this.url, body);
   }
 
-  update(taskId: string, changes: TaskPatchDto): Observable<TaskDto> {
-    return this.http.patch<TaskDto>(this.taskUrl(taskId), changes);
+  // PUT: replaces the whole task with the edited version (the edit form always submits every
+  // field), so what the server stores is exactly what the form showed.
+  update(boardId: string, taskId: string, task: Omit<Task, 'id'>): Observable<TaskDto> {
+    const body: TaskDto = { ...task, id: taskId, boardId };
+    return this.http.put<TaskDto>(this.taskUrl(taskId), body);
   }
 
   delete(taskId: string): Observable<void> {

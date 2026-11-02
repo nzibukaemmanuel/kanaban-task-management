@@ -111,8 +111,10 @@ describe('BoardService', () => {
     httpMock.expectOne('https://api.test/boards').flush(BOARDS);
 
     const deleted = firstValueFrom(service.delete('roadmap'), { defaultValue: undefined });
-    const req = httpMock.expectOne('https://api.test/boards/roadmap');
+    const req = httpMock.expectOne((r) => r.url === 'https://api.test/boards/roadmap');
     expect(req.request.method).toBe('DELETE');
+    // json-server only cascades to a board's tasks when asked; the mock API always does.
+    expect(req.request.params.get('_dependent')).toBe('tasks');
     req.flush(null);
     await deleted;
 

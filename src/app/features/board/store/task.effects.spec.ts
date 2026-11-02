@@ -6,6 +6,7 @@ import { MOCK_API_LATENCY_MS } from '../../../core/api/api.config';
 import { mockApiInterceptor } from '../../../core/api/mock-api.interceptor';
 import { TaskService } from '../task.service';
 import { TaskActions } from './task.actions';
+import { fixtureTaskValue } from './testing';
 import { TaskEffects } from './task.effects';
 
 // Each effect runs against the real TaskService and the in-memory mock API (zero latency), so
@@ -89,12 +90,12 @@ describe('TaskEffects', () => {
     }
   });
 
-  it('updateTask$ patches the task and reports an Update<TaskEntity>', async () => {
+  it('updateTask$ replaces the task (PUT) and reports an Update<TaskEntity>', async () => {
     actions$.next(
       TaskActions.updateTask({
         boardId: 'roadmap',
         taskId: 'q1-goals',
-        changes: { status: 'done' },
+        task: fixtureTaskValue('roadmap', 'q1-goals', { status: 'done' }),
       }),
     );
 
@@ -109,7 +110,11 @@ describe('TaskEffects', () => {
 
   it('updateTask$ reports a Failure when the task no longer exists', async () => {
     actions$.next(
-      TaskActions.updateTask({ boardId: 'roadmap', taskId: 'ghost', changes: { status: 'done' } }),
+      TaskActions.updateTask({
+        boardId: 'roadmap',
+        taskId: 'ghost',
+        task: fixtureTaskValue('roadmap', 'q1-goals'),
+      }),
     );
 
     const result = await firstValueFrom(effects.updateTask$);

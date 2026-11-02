@@ -19,7 +19,7 @@ export const TaskActions = createActionGroup({
     'Add Task Success': props<{ task: TaskEntity }>(),
     'Add Task Failure': props<{ error: string }>(),
 
-    'Update Task': props<{ boardId: string; taskId: string; changes: Partial<Omit<Task, 'id'>> }>(),
+    'Update Task': props<{ boardId: string; taskId: string; task: Omit<Task, 'id'> }>(),
     'Update Task Success': props<{ update: Update<TaskEntity> }>(),
     'Update Task Failure': props<{ error: string }>(),
 

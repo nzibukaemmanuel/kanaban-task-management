@@ -6,7 +6,7 @@ import { provideStore } from '@ngrx/store';
 import { MOCK_API_LATENCY_MS } from '../../../core/api/api.config';
 import { mockApiInterceptor } from '../../../core/api/mock-api.interceptor';
 import { BoardService } from '../board.service';
-import { BOARD_TASKS } from '../board-data';
+import { BOARD_TASKS, Task } from '../board-data';
 import { taskAdapter, taskReducer, TaskState } from './task.reducer';
 import { TaskEffects } from './task.effects';
 import { TASK_FEATURE_KEY } from './task.selectors';
@@ -55,4 +55,14 @@ export async function loadBoardsForTests(): Promise<void> {
     }
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
+}
+
+// A fixture task as the plain (id-less) value a form would submit, optionally with fields changed.
+export function fixtureTaskValue(
+  boardId: string,
+  taskId: string,
+  changes: Partial<Omit<Task, 'id'>> = {},
+): Omit<Task, 'id'> {
+  const { id: _id, ...task } = BOARD_TASKS[boardId].find((candidate) => candidate.id === taskId)!;
+  return { ...structuredClone(task), ...changes };
 }

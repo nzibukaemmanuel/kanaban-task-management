@@ -56,7 +56,7 @@ export class EditTask implements ComponentWithUnsavedChanges {
         this.goToTask();
       });
     this.store.dispatch(
-      TaskActions.updateTask({ boardId: this.boardId(), taskId: this.taskId(), changes: value }),
+      TaskActions.updateTask({ boardId: this.boardId(), taskId: this.taskId(), task: value }),
     );
   }
 
