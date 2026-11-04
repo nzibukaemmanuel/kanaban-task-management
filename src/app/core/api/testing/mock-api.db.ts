@@ -1,6 +1,7 @@
+// Test-only in-memory backend: specs use it so effects/components run against a working REST API.
 import { Injectable } from '@angular/core';
-import { BOARD_IDS, BOARD_TASKS } from '../../features/board/board-data';
-import { BoardDto, TaskCreateDto, TaskDto, TaskPatchDto } from './api.models';
+import { BOARD_IDS, BOARD_TASKS } from '../../../features/board/board-data';
+import { BoardDto, TaskCreateDto, TaskDto, TaskPatchDto } from '../api.models';
 
 export class MockApiError extends Error {
   constructor(

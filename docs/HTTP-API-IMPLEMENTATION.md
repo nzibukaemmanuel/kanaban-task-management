@@ -14,21 +14,16 @@ was verified. File paths are relative to the repository root.
 The app used to read a static fixture (`board-data.ts`) directly. Every read and write now goes through Angular's
 `HttpClient` to a REST API, with loading, error and retry states in the UI.
 
-The API can be one of two backends, chosen by environment file:
-
-| Backend | How to run | Used by |
-|---|---|---|
-| **In-browser mock API** — an `HttpInterceptorFn` answering `/api/*` from an in-memory database | `npm start` | development, and the production build (no hosted server exists yet) |
-| **Real REST API — json-server** on `http://localhost:3000` serving `server/db.json` | `npm run api` then `npm run start:local` | demonstrating real cross-origin HTTP |
-
-Both are seeded from the same fixture and implement the same endpoints, so nothing above `HttpClient` knows which one
+The app talks to a real REST API: **json-server** on `http://localhost:3000` serving `server/db.json`
+(`npm run api`, then `npm start`). The app ships no mock data; an in-memory backend in `src/app/core/api/testing/` is
+used by specs only.
 is active.
 
 ### Architecture
 
 ```
 Component ──dispatch──▶ NgRx Effect ──▶ TaskService / BoardService ──HttpClient──▶ API
-    ▲                       │                                                      (mock interceptor
+    ▲                       │                                                      (json-server)
     │                       ▼                                                       or json-server)
     └── selectors ◀── Reducer ◀── Success / Failure action
 ```
@@ -59,7 +54,7 @@ synchronously), and the board list came from a synchronous `BoardService`. No re
 possible.
 
 **Preparation.**
-- `board-data.ts` stays as the *seed* for the mock API and `server/db.json`; the app no longer reads it directly.
+- `board-data.ts` stays as the *seed* for `server/db.json` and the test-only backend; the app no longer reads it directly.
 - Wire types shared by both sides of the HTTP boundary were defined in `src/app/core/api/api.models.ts`
   (`BoardDto`, `TaskDto`, `TaskCreateDto`).
 - The store was changed to start empty (`loaded: false`) so that "data not here yet" is a real state the UI can show.
@@ -67,10 +62,9 @@ possible.
 ## Task 2 — Enable HTTP functionality
 
 - `HttpClient` is registered in `src/app/app.config.ts` through `provideApi(environment)`
-  (`src/app/core/api/api.providers.ts`), which also supplies the `API_BASE_URL` token and attaches the mock interceptor
-  only when `useMockApi` is on.
+  (`src/app/core/api/api.providers.ts`), which supplies the `API_BASE_URL` token
 - **Configuration is organised, not hard-coded:** `src/app/core/api/api.config.ts` holds the `API_BASE_URL` and
-  `MOCK_API_LATENCY_MS` injection tokens and an `API_ENDPOINTS` map (`boards`, `tasks`). Services build URLs from these.
+  injection token and an `API_ENDPOINTS` map (`boards`, `tasks`). Services build URLs from these.
 - Environment files live in `src/environments/` (see the Bonus section).
 - **Build check:** `ng build` succeeds (production configuration, with the file replacement applied).
 
@@ -135,7 +129,7 @@ URL-encoded, typed DTOs, no component or store imports inside the services (reus
   (`role="alert"`) with a **Try again** button. `BoardDataStatus` combines "boards loaded" and "tasks loaded" so
   `Boards` and `BoardDetails` behave identically. Retry re-requests only what is missing.
 - **Failed writes** are reported by the form/page that caused them and do not blank the screen.
-- To see the error state with the mock API: `localStorage.setItem('kanban-mock-api-fail', 'true')` and reload.
+- To see the error state, stop `npm run api` and reload.
 
 ## Task 8 — Optimise data handling
 
@@ -148,7 +142,7 @@ URL-encoded, typed DTOs, no component or store imports inside the services (reus
 - **Propagation.** Components `selectSignal(...)` from the store, so one successful write updates every view.
 - **Separation of concerns (the benefit).** Because only the services know about HTTP, swapping the transport,
   adding auth headers, retries or caching touches one layer. This was demonstrated concretely: the *same* app now runs
-  unchanged against the in-browser mock and against json-server.
+  unchanged against the test-only backend and json-server.
 
 ## Task 9 — Testing and verification
 
@@ -156,22 +150,19 @@ URL-encoded, typed DTOs, no component or store imports inside the services (reus
 
 | Area | Spec | What it proves |
 |---|---|---|
-| Mock API | `mock-api.interceptor.spec.ts` | every route and verb: GET, POST, **PUT**, PATCH, DELETE; 400/404/409/500 paths; board cascade |
+| Test-only backend | `core/api/testing/mock-api.interceptor.spec.ts` | every route and verb: GET, POST, **PUT**, PATCH, DELETE; 400/404/409/500 paths; board cascade |
 | Error mapping | `api-error.spec.ts` | each status class → message |
 | Services | `task.service.spec.ts`, `board.service.spec.ts` | verbs, URLs, query params, bodies, caching, de-duplication, retry, error pass-through (via `HttpTestingController`) |
 | Store | `task.reducer.spec.ts`, `task.effects.spec.ts`, `task.selectors.spec.ts` | state transitions, success **and** failure actions |
-| Environments | `api.providers.spec.ts` | mock vs. real network selected by config; three environment files |
+| Environments | `api.providers.spec.ts` | real requests to `apiUrl`; two environment files |
 | UI states | `data-state.spec.ts`, `board-data-status.spec.ts`, `boards.spec.ts` | loading → ready, error → retry → recovered |
 | Forms and routes | `add-task`, `edit-task`, `task-detail`, `task-form-routing.integration` specs | save, delete, navigation, and the failure path (stay on form) |
 | Boards | `boards.spec.ts`, `board-details.spec.ts`, `board-id.spec.ts` | create (valid/invalid/failed), delete (confirm/decline/success/failure) |
 
-**Manual / end-to-end (real Edge browser, scripted):** a full lifecycle — log in → create board → create task (POST)
-→ edit task (PUT) → delete task (DELETE) → delete board — was run in two modes:
-
-1. **In-browser mock API** — all steps passed, **no console errors**.
-2. **Real json-server** (`npm run api` + `npm run start:local`) — all steps passed with real network traffic
-   (`GET /boards`, `GET /tasks`, `POST`, `PUT`, `DELETE`, `DELETE /boards/:id?_dependent=tasks`, plus CORS `OPTIONS`
-   preflights), **no console errors**.
+→ edit task (PUT) → delete task (DELETE) → delete board — was run against **real json-server** (`npm run api` + `npm start`):
+all steps passed with real network traffic
+(`GET /boards`, `GET /tasks`, `POST`, `PUT`, `DELETE`, `DELETE /boards/:id?_dependent=tasks`, plus CORS `OPTIONS`
+preflights), **no console errors**.
 
 With json-server stopped, the Boards page showed *"Couldn't load boards. The server can't be reached — check your
 connection and try again."* with a **Try again** button.
@@ -183,27 +174,24 @@ connection and try again."* with a **Try again** button.
   with a clear, incremental history.
 - `netlify.toml` builds with `npm run build`, publishes `dist/Kanban-Task-Management-Web-App/browser`, and has an SPA
   catch-all redirect; `public/_redirects` does the same for hosts that read it.
-- The production build uses `environment.prod.ts` (`apiUrl: '/api'`, `useMockApi: true`), so the deployed app is
-  self-contained and needs no server.
+- The production build uses `environment.prod.ts` (`apiUrl: '/api'`) — set it to a hosted API before deploying.
 
 **Still to do (needs the owner's Netlify/Vercel account)**
 1. Connect the GitHub repo to Netlify (or run `netlify deploy --prod`), build command `npm run build`.
 2. Open the live URL and repeat the Task 9 lifecycle to confirm the API integration works there.
-3. If a hosted backend is wanted instead of the mock, deploy `server/db.json` with json-server to a service such as
-   Render, then set `apiUrl` to its URL and `useMockApi: false` in `src/environments/environment.prod.ts`.
+3. Deploy `server/db.json` with json-server to a service such as
+   Render, then set `apiUrl` to its URL in `src/environments/environment.prod.ts`.
 
 ## Bonus — Environment configuration
 
-| | `environment.ts` (`ng serve`) | `environment.local.ts` (`-c local`) | `environment.prod.ts` (`ng build`) |
-|---|---|---|---|
-| `apiUrl` | `/api` | `http://localhost:3000` | `/api` |
-| `useMockApi` | `true` | `false` | `true` |
-| `mockLatencyMs` | 500 | 0 | 200 |
+| | `environment.ts` (`ng serve`) | `environment.prod.ts` (`ng build`) |
+|---|---|---|
+| `apiUrl` | `http://localhost:3000` | `/api` — set to the hosted API |
 
 - `environment.model.ts` defines the `Environment` interface every file must satisfy (kept separate because
   `angular.json` swaps files at build time).
-- `angular.json` `fileReplacements` select the file per configuration (`production`, `local`).
-- **Switching was tested** (`api.providers.spec.ts`) and exercised end to end in the browser (mock vs. json-server).
+- `angular.json` `fileReplacements` select the file per configuration (`production`).
+- **Switching was tested** (`api.providers.spec.ts`).
 - **Secrets:** environment files are compiled into the client bundle, so no API keys or credentials belong in them.
   This app needs none; a real secret should live behind a server (or be injected at deploy time as a non-secret public
   key).
@@ -212,17 +200,16 @@ connection and try again."* with a **Try again** button.
 
 ## Limitations and honest notes
 
-- The deployed build uses the in-browser mock, so changes made in the live app reset on reload. It is a faithful
-  stand-in for a server, not a persistent one.
+- The deployed build has no backend until `environment.prod.ts` points at a hosted API.
 - json-server does not enforce business rules (e.g. duplicate titles); the form validator covers that on the client,
-  while the mock API enforces it server-side to demonstrate 409 handling.
+  while the test-only backend enforces it server-side to exercise 409 handling.
 - Login is a fixed demo credential held in memory (no real auth backend), as in earlier labs.
 
 ## Repository map (new or changed for this lab)
 
 ```
-src/environments/                 environment.ts, .local.ts, .prod.ts, .model.ts
-src/app/core/api/                 api.config, api.providers, api.models, api-error, mock-api.db, mock-api.interceptor
+src/environments/                 environment.ts, .prod.ts, .model.ts
+src/app/core/api/                 api.config, api.providers, api.models, api-error, testing/ (test-only mock backend)
 src/app/features/board/           task.service, board.service, board-data-status, board-id,
                                   boards/, board-details/, add-task/, edit-task/, task-detail/, task-form/
 src/app/features/board/store/     actions, reducer, effects, selectors, testing helpers

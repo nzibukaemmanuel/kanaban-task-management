@@ -7,7 +7,8 @@ import {
 } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Observable, delay, of, throwError } from 'rxjs';
-import { API_BASE_URL, MOCK_API_LATENCY_MS } from './api.config';
+import { API_BASE_URL } from '../api.config';
+import { MOCK_API_LATENCY_MS } from './mock-api.config';
 import { MockApiDb, MockApiError } from './mock-api.db';
 
 // Stands in for a backend: requests under API_BASE_URL are answered from MockApiDb instead of

@@ -2,8 +2,8 @@ import { HttpErrorResponse, provideHttpClient, withInterceptors } from '@angular
 import { TestBed } from '@angular/core/testing';
 import { provideMockActions } from '@ngrx/effects/testing';
 import { firstValueFrom, ReplaySubject, throwError } from 'rxjs';
-import { MOCK_API_LATENCY_MS } from '../../../core/api/api.config';
-import { mockApiInterceptor } from '../../../core/api/mock-api.interceptor';
+import { MOCK_API_LATENCY_MS } from '../../../core/api/testing/mock-api.config';
+import { mockApiInterceptor } from '../../../core/api/testing/mock-api.interceptor';
 import { TaskService } from '../task.service';
 import { TaskActions } from './task.actions';
 import { fixtureTaskValue } from './testing';

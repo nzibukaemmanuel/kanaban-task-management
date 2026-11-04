@@ -58,17 +58,6 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
-            },
-            "local": {
-              "optimization": false,
-              "extractLicenses": false,
-              "sourceMap": true,
-              "fileReplacements": [
-                {
-                  "replace": "src/environments/environment.ts",
-                  "with": "src/environments/environment.local.ts"
-                }
-              ]
             }
           },
           "defaultConfiguration": "production"
@@ -81,9 +70,6 @@
             },
             "development": {
               "buildTarget": "Kanban-Task-Management-Web-App:build:development"
-            },
-            "local": {
-              "buildTarget": "Kanban-Task-Management-Web-App:build:local"
             }
           },
           "defaultConfiguration": "development"

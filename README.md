@@ -4,21 +4,13 @@ This project was generated using [Angular CLI](https://github.com/angular/angula
 
 ## HTTP & API integration
 
-All board and task data travels over Angular's `HttpClient`, against one of two interchangeable backends:
-
-- **In-browser mock API** (default for `ng serve` and the deployed build): `core/api/mock-api.interceptor.ts`
-  answers `/api/*` requests from an in-memory database (`mock-api.db.ts`) after a simulated latency.
-- **Real REST API via json-server** (`npm run api` + `npm run start:local`): a separate process on
-  `http://localhost:3000` serving `server/db.json`, so the browser makes genuine cross-origin HTTP requests
-  (including CORS preflights).
-
-Both are seeded from the same fixture and speak the same REST dialect, so the services, effects and components
-are identical either way — choosing one is a config change, not a code change.
+All board and task data travels over Angular's `HttpClient` to a real REST API: json-server serving
+`server/db.json` on `http://localhost:3000`, so the browser makes genuine cross-origin HTTP requests (including
+CORS preflights). The app ships no mock data; `core/api/testing/` holds an in-memory backend that specs alone use.
 
 ```bash
-npm start               # dev server, in-browser mock API
 npm run api             # terminal 1: json-server on :3000 (works on a throwaway copy of server/db.json)
-npm run start:local     # terminal 2: app pointed at json-server
+npm start               # terminal 2: dev server pointed at it
 npm run generate:db     # rebuild server/db.json from board-data.ts
 ```
 
@@ -41,7 +33,7 @@ body, which `describeHttpError` turns into a user-facing sentence ("The server c
 ### Layers
 
 ```
-component ──dispatch──▶ TaskEffects ──▶ TaskService (HttpClient) ──▶ /api  (mock interceptor or real server)
+component ──dispatch──▶ TaskEffects ──▶ TaskService (HttpClient) ──▶ /api  (json-server)
     ▲                       │
     └── store selectors ◀── reducer ◀── Success / Failure action
 ```
@@ -67,8 +59,7 @@ component ──dispatch──▶ TaskEffects ──▶ TaskService (HttpClient)
   duplicates) and delete one from its page. Deleting always asks first, names how many tasks go with it, and only
   updates the UI after the server confirms.
 - **Loading / errors:** boards pages show a spinner until both datasets arrive, and an error with retry if
-  either fails. To see the error state locally run `localStorage.setItem('kanban-mock-api-fail', 'true')` in
-  the browser console and reload (remove the key to recover).
+  either fails.
 - **Fewer requests:** boards and tasks are fetched once at bootstrap and cached (signal / NgRx store); every
   page reads the cache, so navigating between boards makes no requests. `BoardService.load()` also
   de-duplicates concurrent callers.
@@ -77,27 +68,23 @@ component ──dispatch──▶ TaskEffects ──▶ TaskService (HttpClient)
 
 ### Environments (bonus)
 
-Three configurations, all satisfying `Environment` from `environment.model.ts`; `angular.json` swaps the file
+Two configurations, both satisfying `Environment` from `environment.model.ts`; `angular.json` swaps the file
 at build time with `fileReplacements`:
 
-| | `environment.ts` (`ng serve`) | `environment.local.ts` (`-c local`) | `environment.prod.ts` (`ng build`) |
-|---|---|---|---|
-| `apiUrl` | `/api` | `http://localhost:3000` | `/api` |
-| `useMockApi` | `true` | `false` | `true` |
-| `mockLatencyMs` | 500 | 0 | 200 |
+| | `environment.ts` (`ng serve`) | `environment.prod.ts` (`ng build`) |
+|---|---|---|
+| `apiUrl` | `http://localhost:3000` | `/api` — set to the deployed API's URL |
 
-`provideApi(environment)` (`core/api/api.providers.ts`) is the single place that turns these values into providers:
-the `API_BASE_URL` token plus `HttpClient`, with the mock interceptor only when `useMockApi` is on. To deploy
-against a real backend, set `useMockApi: false` and `apiUrl` to its URL in `environment.prod.ts`. No secrets
-belong in these files — they ship in the client bundle.
+`provideApi(environment)` (`core/api/api.providers.ts`) turns these values into the `API_BASE_URL` token plus
+`HttpClient`. No secrets belong in these files — they ship in the client bundle.
 
 ### Testing the API layer
 
-- `mock-api.interceptor.spec.ts` — every route, status code and the failure flag through a real `HttpClient`.
+- `core/api/testing/mock-api.interceptor.spec.ts` — the test-only in-memory backend (the app itself ships no mock data).
 - `task.service.spec.ts` / `board.service.spec.ts` — `HttpTestingController`: verbs, URLs, query params,
   bodies, caching and error pass-through.
-- `task.effects.spec.ts` — each effect against the mock API, plus server-error → `Failure` paths.
-- `api.providers.spec.ts` — environment switching: mock vs. real network, and the three environment files.
+- `task.effects.spec.ts` — each effect against the test-only in-memory API, plus server-error → `Failure` paths.
+- `api.providers.spec.ts` — `API_BASE_URL`, real requests to `apiUrl`, and the two environment files.
 - Component specs cover the success path *and* the failure path (stay on the form / task, show the error).
 
 ## State management
@@ -262,3 +249,12 @@ Angular CLI does not come with an end-to-end testing framework by default. You c
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+
+## Deploying the API
+
+The production build needs a hosted API (a static host like Netlify serves no `/api`). `render.yaml` is a Render
+Blueprint that runs json-server on `server/db.json`:
+
+1. Push the repo, then in Render choose **New → Blueprint** and select it; note the service URL.
+2. Set `apiUrl` in `src/environments/environment.prod.ts` to that URL (e.g. `https://kanban-api.onrender.com`).
+3. Redeploy the app. Data resets to `db.json` when the free instance restarts.

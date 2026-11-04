@@ -5,8 +5,4 @@ export interface Environment {
   production: boolean;
   // Base URL every data service prefixes its endpoints with.
   apiUrl: string;
-  // true → answer requests from the in-memory mock API instead of the network.
-  useMockApi: boolean;
-  // Simulated network round-trip for the mock API, in milliseconds.
-  mockLatencyMs: number;
 }

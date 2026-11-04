@@ -8,11 +8,6 @@ export const API_BASE_URL = new InjectionToken<string>('API_BASE_URL', {
   factory: () => environment.apiUrl,
 });
 
-export const MOCK_API_LATENCY_MS = new InjectionToken<number>('MOCK_API_LATENCY_MS', {
-  providedIn: 'root',
-  factory: () => environment.mockLatencyMs,
-});
-
 export const API_ENDPOINTS = {
   boards: 'boards',
   tasks: 'tasks',
