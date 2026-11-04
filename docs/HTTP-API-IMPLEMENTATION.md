@@ -186,7 +186,7 @@ connection and try again."* with a **Try again** button.
 
 | | `environment.ts` (`ng serve`) | `environment.prod.ts` (`ng build`) |
 |---|---|---|
-| `apiUrl` | `http://localhost:3000` | `/api` — set to the hosted API |
+| `apiUrl` | `http://localhost:3000` | `https://kanban-api-h8q1.onrender.com` |
 
 - `environment.model.ts` defines the `Environment` interface every file must satisfy (kept separate because
   `angular.json` swaps files at build time).

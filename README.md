@@ -73,7 +73,7 @@ at build time with `fileReplacements`:
 
 | | `environment.ts` (`ng serve`) | `environment.prod.ts` (`ng build`) |
 |---|---|---|
-| `apiUrl` | `http://localhost:3000` | `/api` — set to the deployed API's URL |
+| `apiUrl` | `http://localhost:3000` | `https://kanban-api-h8q1.onrender.com` (Render) |
 
 `provideApi(environment)` (`core/api/api.providers.ts`) turns these values into the `API_BASE_URL` token plus
 `HttpClient`. No secrets belong in these files — they ship in the client bundle.

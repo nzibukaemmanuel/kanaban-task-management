@@ -4,5 +4,5 @@ import type { Environment } from './environment.model';
 // Set `apiUrl` to the URL of the deployed REST API (same routes as server/db.json: /boards, /tasks).
 export const environment: Environment = {
   production: true,
-  apiUrl: '/api',
+  apiUrl: 'https://kanban-api-h8q1.onrender.com',
 };

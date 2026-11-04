@@ -29,6 +29,6 @@ describe('provideApi', () => {
 
   it('ships distinct development and production configurations', () => {
     expect(development).toMatchObject({ production: false, apiUrl: 'http://localhost:3000' });
-    expect(production).toMatchObject({ production: true, apiUrl: '/api' });
+    expect(production).toMatchObject({ production: true, apiUrl: 'https://kanban-api-h8q1.onrender.com' });
   });
 });
